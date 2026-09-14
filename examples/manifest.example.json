@@ -1,0 +1,9 @@
+{
+  "items": [
+    {
+      "item_id": "sample-001",
+      "video_path": "/srv/audio-inspector/input/sample-001.mp4",
+      "expected_text": "我们先观察图形，再写出计算过程。"
+    }
+  ]
+}

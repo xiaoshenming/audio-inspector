@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "audio-inspector"
+version = "0.1.0"
+description = "Evidence-only TTS audio inspection for rendered teaching videos"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "cn2an>=0.5.23,<1",
+  "faster-whisper>=1.1,<2",
+  "pypinyin>=0.55,<1",
+]
+
+[project.optional-dependencies]
+pronunciation = [
+  "g2pW>=0.1.1",
+  "torch>=2.2",
+  "transformers>=4.40,<5",
+]
+dev = [
+  "pytest>=8,<9",
+  "ruff>=0.9",
+]
+
+[project.scripts]
+audio-inspector = "audio_inspector.cli:main"
+audio-inspector-polyphone-prepare = "audio_inspector.polyphone_prepare:main"
+audio-inspector-polyphone-run = "audio_inspector.polyphone_batch:main"
+audio-inspector-polyphone-report = "audio_inspector.polyphone_report:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
