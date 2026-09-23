@@ -19,6 +19,8 @@ def test_single_clear_gap_is_prioritized_but_optional_visual_detail_is_not():
                               "source_quote": "已知向量与 b 不共线"}]) == "A"
     assert _source_priority([{"confidence": "high", "category": "source_missing_object",
                               "source_quote": "该线在平面外"}] * 3) == "B"
+    assert _source_priority([{"confidence": "high", "category": "source_missing_object",
+                              "source_quote": "已知集合和集合 B"}]) == "A"
 
 
 def test_literal_reading_adds_previously_clean_video_to_priority_a(tmp_path):

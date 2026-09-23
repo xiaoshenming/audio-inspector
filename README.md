@@ -75,4 +75,6 @@ dev-pb2-close-loop --request request.json --work-root /private/dev-pb2-runs \
 
 随后对 152 条中的全部 65 条机器候选做了隔离批测：65 条都有新 MP4，40 条新成片复筛无候选，详见[65 条真实样本报告](docs/real-65-closure.md)。该批量试验使用机器建议模拟文字确认；没有员工的真实审核标签，不能作为人工认可修复率。
 
+再以独立听写和第二套源码复核核查了旧版“未报问题”和“修复后干净”两组，发现明确漏报及自动改文引入新错；**40/65 不能用于自动放行决策**。见[可用度与漏检风险审计](docs/independent-reliability-audit.md)。
+
 开发检查：`python -m pytest && python -m ruff check src tests && python -m compileall -q src tests`。

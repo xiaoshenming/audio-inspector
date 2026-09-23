@@ -14,9 +14,9 @@ from .subtitle_cues import cue_match_score, read_srt_cues
 FUNCTION = re.compile(r"(?<![A-Za-z0-9_])(?:[fgh]|sin|cos|tan|ln)'?\s*\([^()]{1,20}\)",
                       re.IGNORECASE)
 BRACKETS = re.compile(
-    r"左[小中大]?[括扣扩拓阔口][号弧].{0,45}?右[小中大]?[括扣扩拓阔口][号弧]"
+    r"左[小中大]?[括扣扩拓阔口库过锅][号弧].{0,45}?右[小中大]?[括扣扩拓阔口库过锅][号弧]"
 )
-SPOKEN_BRACKET = re.compile(r"[左右][小中大]?[括扣扩拓阔口][号弧]")
+SPOKEN_BRACKET = re.compile(r"[左右][小中大]?[括扣扩拓阔口库过锅][号弧]")
 
 
 def _excerpt(text: str, match: re.Match) -> str:

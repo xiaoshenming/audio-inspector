@@ -110,7 +110,8 @@ def publish(root: Path) -> dict:
               "video_sha256": identity["video_sha256"],
               "source_sha256": identity["source_sha256"],
               "status": status, "lanes": lane_status, "issues": issues,
-              "can_continue": status == "clean", "needs_admin_review": status != "clean"}
+              "can_continue": status == "clean", "needs_admin_review": status != "clean",
+              "evidence_only": True, "unattended_release_validated": False}
     (root / "inspection.json").write_text(json.dumps(result, ensure_ascii=False,
                                                       indent=2) + "\n")
     return result
@@ -143,7 +144,8 @@ def run(request: dict, work_root: Path) -> dict:
         asr_dir=root / "asr-qwen", source_review_dir=root / "semantic-source"))
     stage("literal-asr-targeted", lambda: literal_asr.run_batch(
         manifest, root / "literal-asr-targeted",
-        model_name=os.environ.get("DEV_PB2_WHISPER_MODEL", "small"), targeted=True))
+        model_name=os.environ.get("DEV_PB2_WHISPER_MODEL", "small"),
+        targeted=True, max_clips=0))
     stage("literal-reading", lambda: literal_reading.run_batch(
         manifest, root / "literal-asr-targeted", root / "literal-reading"))
     return publish(root)

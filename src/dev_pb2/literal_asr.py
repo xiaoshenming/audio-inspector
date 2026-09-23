@@ -51,7 +51,7 @@ def target_clips(record: dict, max_clips: int = 3) -> list[dict]:
         relevant.sort(key=lambda cue: cue["start_seconds"])
     if not relevant:
         return [{"start_seconds": 0.0, "end_seconds": 30.0}] if not cues else []
-    if len(relevant) > max_clips:
+    if max_clips > 0 and len(relevant) > max_clips:
         indices = {round(i * (len(relevant) - 1) / max(1, max_clips - 1))
                    for i in range(max_clips)}
         relevant = [relevant[i] for i in sorted(indices)]
@@ -155,8 +155,8 @@ def main() -> None:
     parser.add_argument("--targeted", action="store_true")
     parser.add_argument("--max-clips", type=int, default=3)
     args = parser.parse_args()
-    if args.cpu_threads < 1 or args.max_clips < 1:
-        parser.error("--cpu-threads and --max-clips must be positive")
+    if args.cpu_threads < 1 or args.max_clips < 0:
+        parser.error("--cpu-threads must be positive; --max-clips must be nonnegative")
     print(json.dumps(run_batch(args.manifest, args.output, args.model,
                                args.cpu_threads, args.limit, args.targeted,
                                args.max_clips), ensure_ascii=False))

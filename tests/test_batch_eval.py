@@ -16,6 +16,11 @@ def test_literal_rewrite_proposes_natural_speech_and_keeps_math_object():
     assert edits[1]["new_text"] == "因此 f 在 x 处的值 小于一"
     assert _literal_rewrite("f(x+3) 等于负 f(x)") == \
         "f 在 x 加 3 处的值 等于负 f 在 x 处的值"
+    assert _literal_rewrite("已知函数 f(x) 为奇函数") == "已知函数 f 为奇函数"
+    assert _literal_rewrite("因为 f(x) 是奇函数") == "因为 函数 f 是奇函数"
+    assert _literal_rewrite("将 f(x) 化为二倍正弦") == "将函数 f 的表达式化为二倍正弦"
+    assert _literal_rewrite("g(x_1) 等于 f(2x_1)") == \
+        "g 在 x 下标 1 处的值 等于 f 在 2x 下标 1 处的值"
 
 
 def test_missing_proposal_stays_visible_as_unrepairable():

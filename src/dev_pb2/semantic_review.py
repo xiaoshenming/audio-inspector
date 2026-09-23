@@ -16,6 +16,11 @@ from difflib import SequenceMatcher
 from pathlib import Path
 
 from .manifest import load_manifest
+from .source_patterns import (
+    function_value_misphrasing,
+    missing_perpendicular_object,
+    missing_set_label,
+)
 from .text_normalization import comparison_text
 
 ENDPOINT = "https://api.deepseek.com/anthropic/v1/messages"
@@ -188,6 +193,13 @@ def review_one(row: dict, questions: dict, asr_items: dict, source_issues: dict,
     response, usage = _request(system, data, key)
     issues, discarded = (_validate_source(response["issues"], lines) if mode == "source"
                          else _validate_audio(response["issues"], lines, asr["segments"]))
+    if mode == "source":
+        existing = {(issue.get("line"), issue.get("source_quote")) for issue in issues}
+        patterns = (missing_set_label(lines, _context(questions.get(item_id)))
+                    + function_value_misphrasing(lines)
+                    + missing_perpendicular_object(lines))
+        issues.extend(issue for issue in patterns
+                      if (issue["line"], issue["source_quote"]) not in existing)
     source_overlap = 0
     if mode == "audio":
         retained = []

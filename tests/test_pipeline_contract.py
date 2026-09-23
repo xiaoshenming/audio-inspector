@@ -32,6 +32,7 @@ def test_clean_result_allows_normal_delivery(tmp_path):
     result = publish(root)
     assert result["status"] == "clean"
     assert result["can_continue"] is True
+    assert result["unattended_release_validated"] is False
     assert result["issues"] == []
 
 

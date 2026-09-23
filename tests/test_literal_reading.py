@@ -91,3 +91,26 @@ def test_asr_homophone_left_kou_is_a_literal_bracket_candidate(tmp_path):
         {"start_ms": 0, "end_ms": 4000, "text": "已知函数f左口号x右口号的值"},
     ]}
     assert len(detect_one({"source_path": str(source), "subtitle_path": str(subtitle)}, asr)) == 1
+
+
+def test_asr_kuo_homophones_are_not_silently_dropped(tmp_path):
+    source = tmp_path / "main.py"
+    source.write_text('self.voiceover(text="已知函数 f(x) 的值")\n')
+    record = {"source_path": str(source), "subtitle_path": ""}
+    for word in ("库", "过", "锅"):
+        asr = {"status": "completed", "segments": [{"start_ms": 0,
+                "end_ms": 4000, "text": f"已知函数 f 左{word}号 x 右{word}号的值"}]}
+        assert len(detect_one(record, asr)) == 1
+
+
+def test_complete_pipeline_can_inspect_every_function_cue(tmp_path):
+    source = tmp_path / "main.py"
+    texts = [f"第{i}步求函数 f(x) 的值" for i in range(4)]
+    source.write_text("\n".join(f'self.voiceover(text="{text}")' for text in texts))
+    subtitle = tmp_path / "video.srt"
+    subtitle.write_text("\n\n".join(
+        f"{i + 1}\n00:00:{i * 10:02d},000 --> 00:00:{i * 10 + 8:02d},000\n{text}"
+        for i, text in enumerate(texts)))
+    record = {"source_path": str(source), "subtitle_path": str(subtitle)}
+    assert len(target_clips(record)) == 3
+    assert len(target_clips(record, max_clips=0)) == 4
