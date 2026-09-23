@@ -30,6 +30,9 @@ audio-inspector = "audio_inspector.cli:main"
 audio-inspector-polyphone-prepare = "audio_inspector.polyphone_prepare:main"
 audio-inspector-polyphone-run = "audio_inspector.polyphone_batch:main"
 audio-inspector-polyphone-report = "audio_inspector.polyphone_report:main"
+audio-inspector-qwen-asr = "audio_inspector.qwen_asr:main"
+audio-inspector-semantic-review = "audio_inspector.semantic_review:main"
+audio-inspector-screening-report = "audio_inspector.screening_report:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
