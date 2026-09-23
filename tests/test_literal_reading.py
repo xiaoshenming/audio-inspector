@@ -1,5 +1,5 @@
-from audio_inspector.literal_asr import target_clips
-from audio_inspector.literal_reading import detect_one
+from dev_pb2.literal_asr import target_clips
+from dev_pb2.literal_reading import detect_one
 
 
 def test_raw_fx_spoken_as_left_and_right_bracket_is_candidate(tmp_path):

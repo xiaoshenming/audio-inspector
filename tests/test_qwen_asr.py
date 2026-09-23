@@ -1,4 +1,4 @@
-from audio_inspector.qwen_asr import _decode_events, _response_events
+from dev_pb2.qwen_asr import _decode_events, _response_events
 
 
 def test_cumulative_qwen_events_become_incremental_timed_segments():

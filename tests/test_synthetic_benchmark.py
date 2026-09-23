@@ -1,10 +1,10 @@
 import json
 
-from audio_inspector.semantic_review import voiceovers
-from audio_inspector.synthetic_challenge import build_cases as build_challenge_cases
-from audio_inspector.synthetic_corpus import GROUPS, build_cases, write_corpus
-from audio_inspector.synthetic_eval import _metrics
-from audio_inspector.synthetic_tts import _subtitles
+from dev_pb2.semantic_review import voiceovers
+from dev_pb2.synthetic_challenge import build_cases as build_challenge_cases
+from dev_pb2.synthetic_corpus import GROUPS, build_cases, write_corpus
+from dev_pb2.synthetic_eval import _metrics
+from dev_pb2.synthetic_tts import _subtitles
 
 
 def test_corpus_has_balanced_seeded_truth_and_frozen_sources(tmp_path):

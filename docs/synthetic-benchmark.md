@@ -23,14 +23,14 @@
 在环境变量中提供 `DASHSCOPE_API_KEY`、`DASHSCOPE_TTS_ENDPOINT`、`DASHSCOPE_ASR_ENDPOINT`、`DEEPSEEK_API_KEY`。不要在命令、日志、代码或报告中写明文密钥。TTS 按字符计费；先运行 3 条、再运行校准 90 条，核实完成率和媒体格式后再运行留出 450 条。每阶段逐条保存，可同目录续跑。
 
 ```bash
-audio-inspector-synthetic-corpus --output /private/synthetic-tts
-audio-inspector-synthetic-tts --root /private/synthetic-tts --limit 3 --workers 1
-audio-inspector-synthetic-tts --root /private/synthetic-tts --split calibration
+dev-pb2-synthetic-corpus --output /private/synthetic-tts
+dev-pb2-synthetic-tts --root /private/synthetic-tts --limit 3 --workers 1
+dev-pb2-synthetic-tts --root /private/synthetic-tts --split calibration
 # 校准清单固定后，执行 Qwen ASR、DeepSeek 源码/音频审查、定向逐字 ASR、字面读法检查。
-audio-inspector-synthetic-tts --root /private/synthetic-tts --split holdout
+dev-pb2-synthetic-tts --root /private/synthetic-tts --split holdout
 # 全部媒体生成后，按 docs/screening-workflow.md 的命令对完整 manifest 续跑。
-audio-inspector-screening-report --dataset /private/synthetic-tts
-audio-inspector-synthetic-eval --root /private/synthetic-tts
+dev-pb2-screening-report --dataset /private/synthetic-tts
+dev-pb2-synthetic-eval --root /private/synthetic-tts
 ```
 
 ## 报告口径

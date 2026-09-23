@@ -3,9 +3,9 @@ requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "audio-inspector"
+name = "dev-pb2"
 version = "0.1.0"
-description = "Evidence-only TTS audio inspection for rendered teaching videos"
+description = "Independent evidence-only TTS review module for BatchOps"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -15,37 +15,29 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-pronunciation = [
-  "g2pW>=0.1.1",
-  "torch>=2.2",
-  "transformers>=4.40,<5",
-]
 dev = [
   "pytest>=8,<9",
   "ruff>=0.9",
 ]
 
 [project.scripts]
-audio-inspector = "audio_inspector.cli:main"
-audio-inspector-polyphone-prepare = "audio_inspector.polyphone_prepare:main"
-audio-inspector-polyphone-run = "audio_inspector.polyphone_batch:main"
-audio-inspector-polyphone-report = "audio_inspector.polyphone_report:main"
-audio-inspector-qwen-asr = "audio_inspector.qwen_asr:main"
-audio-inspector-semantic-review = "audio_inspector.semantic_review:main"
-audio-inspector-screening-report = "audio_inspector.screening_report:main"
-audio-inspector-review-server = "audio_inspector.review_server:main"
-audio-inspector-literal-asr = "audio_inspector.literal_asr:main"
-audio-inspector-literal-reading = "audio_inspector.literal_reading:main"
-audio-inspector-synthetic-corpus = "audio_inspector.synthetic_corpus:main"
-audio-inspector-synthetic-tts = "audio_inspector.synthetic_tts:main"
-audio-inspector-synthetic-eval = "audio_inspector.synthetic_eval:main"
-audio-inspector-synthetic-challenge = "audio_inspector.synthetic_challenge:main"
+dev-pb2 = "dev_pb2.cli:main"
+dev-pb2-qwen-asr = "dev_pb2.qwen_asr:main"
+dev-pb2-semantic-review = "dev_pb2.semantic_review:main"
+dev-pb2-screening-report = "dev_pb2.screening_report:main"
+dev-pb2-review-server = "dev_pb2.review_server:main"
+dev-pb2-literal-asr = "dev_pb2.literal_asr:main"
+dev-pb2-literal-reading = "dev_pb2.literal_reading:main"
+dev-pb2-synthetic-corpus = "dev_pb2.synthetic_corpus:main"
+dev-pb2-synthetic-tts = "dev_pb2.synthetic_tts:main"
+dev-pb2-synthetic-eval = "dev_pb2.synthetic_eval:main"
+dev-pb2-synthetic-challenge = "dev_pb2.synthetic_challenge:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-audio_inspector = ["review_static/*"]
+dev_pb2 = ["review_static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

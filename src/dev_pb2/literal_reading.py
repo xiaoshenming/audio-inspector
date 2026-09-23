@@ -7,7 +7,7 @@ import json
 import re
 from pathlib import Path
 
-from .batch import load_manifest
+from .manifest import load_manifest
 from .semantic_review import _match, voiceovers
 from .subtitle_cues import cue_match_score, read_srt_cues
 

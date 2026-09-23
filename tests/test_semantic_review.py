@@ -1,4 +1,4 @@
-from audio_inspector.semantic_review import (
+from dev_pb2.semantic_review import (
     _asr_adds_only,
     _spoken_canonical,
     _validate_audio,

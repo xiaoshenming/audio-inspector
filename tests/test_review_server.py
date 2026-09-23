@@ -7,7 +7,7 @@ from http.server import ThreadingHTTPServer
 
 import pytest
 
-from audio_inspector.review_server import make_handler
+from dev_pb2.review_server import make_handler
 
 
 @pytest.fixture

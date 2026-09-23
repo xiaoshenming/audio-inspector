@@ -21,29 +21,27 @@ Qwen 的 SSE 句子内容会逐次累积；适配器把相邻最终事件切成�
 在受控环境中提供 `DASHSCOPE_API_KEY`、工作空间专属的 `DASHSCOPE_ASR_ENDPOINT` 和 `DEEPSEEK_API_KEY`。不要把密钥或专属端点放入日志、源码或报告。也可以通过 `--endpoint` 传入端点。
 
 ```bash
-audio-inspector-qwen-asr --manifest /private/batch/manifest.json \
+dev-pb2-qwen-asr --manifest /private/batch/manifest.json \
   --output /private/batch/asr-qwen --workers 2
 
-audio-inspector-semantic-review source \
+dev-pb2-semantic-review source \
   --manifest /private/batch/manifest.json \
   --questions /private/batch/metadata/questions.json \
   --output /private/batch/semantic-source --workers 3
 
-audio-inspector-semantic-review audio \
+dev-pb2-semantic-review audio \
   --manifest /private/batch/manifest.json \
   --asr-dir /private/batch/asr-qwen \
   --source-review-dir /private/batch/semantic-source \
   --output /private/batch/semantic-audio --workers 3
 
-audio-inspector-literal-asr --manifest /private/batch/manifest.json \
+dev-pb2-literal-asr --manifest /private/batch/manifest.json \
   --output /private/batch/literal-asr-targeted --targeted --max-clips 3
-audio-inspector-literal-reading --manifest /private/batch/manifest.json \
+dev-pb2-literal-reading --manifest /private/batch/manifest.json \
   --asr-dir /private/batch/literal-asr-targeted \
   --output /private/batch/literal-reading
 
-audio-inspector-screening-report --dataset /private/batch
-audio-inspector serve --manifest /private/batch/manifest.json \
-  --output /private/batch/screening-review --host 127.0.0.1 --port 8766
+dev-pb2-screening-report --dataset /private/batch
 ```
 
 `screening-review/shortlist.csv` 是高优先级核听表，`all_candidates.csv` 包含扩展候选。表中预留人工结论和备注列。网页只播放 manifest 白名单内的视频，并让复核人从证据时间点开始核听。每条模型结果先经过原文引句校验；无法核对的引句不进入复审清单。

@@ -1,7 +1,7 @@
 import csv
 import json
 
-from audio_inspector.screening_report import _reportable, _source_priority, compile_candidates
+from dev_pb2.screening_report import _reportable, _source_priority, compile_candidates
 
 
 def test_self_negating_model_findings_are_not_sent_to_staff():

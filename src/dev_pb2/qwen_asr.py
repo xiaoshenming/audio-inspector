@@ -15,7 +15,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from .batch import load_manifest
+from .manifest import load_manifest
 
 MODEL = "qwen-audio-3.1-asr-flash"
 

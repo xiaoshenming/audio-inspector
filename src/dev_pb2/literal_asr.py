@@ -10,8 +10,8 @@ import tempfile
 import time
 from pathlib import Path
 
-from .batch import load_manifest
 from .literal_reading import FUNCTION, SPOKEN_BRACKET
+from .manifest import load_manifest
 from .semantic_review import _match, voiceovers
 from .subtitle_cues import cue_match_score, read_srt_cues
 

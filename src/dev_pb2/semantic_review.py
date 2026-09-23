@@ -15,7 +15,7 @@ import warnings
 from difflib import SequenceMatcher
 from pathlib import Path
 
-from .batch import load_manifest
+from .manifest import load_manifest
 from .text_normalization import comparison_text
 
 ENDPOINT = "https://api.deepseek.com/anthropic/v1/messages"

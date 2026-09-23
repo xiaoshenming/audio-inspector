@@ -1,0 +1,308 @@
+{
+  "planned": 60,
+  "evaluable": 60,
+  "tts_model": "qwen-audio-3.0-tts-plus",
+  "voice": "longanlufeng",
+  "rate": 0.9,
+  "stage_coverage": {
+    "tts": {
+      "completed": 60,
+      "failed_open": 0,
+      "missing": 0
+    },
+    "qwen_asr": {
+      "completed": 60,
+      "failed_open": 0,
+      "missing": 0
+    },
+    "source_review": {
+      "completed": 60,
+      "failed_open": 0,
+      "missing": 0
+    },
+    "audio_review": {
+      "completed": 60,
+      "failed_open": 0,
+      "missing": 0
+    },
+    "literal_asr": {
+      "completed": 60,
+      "failed_open": 0,
+      "missing": 0
+    },
+    "literal_review": {
+      "completed": 60,
+      "failed_open": 0,
+      "missing": 0
+    }
+  },
+  "provider_usage": {
+    "tts_billed_characters": 8222,
+    "audio_hours": 0.3,
+    "qwen_tokens": 19426,
+    "deepseek_input_tokens": 40908
+  },
+  "incomplete_by_stage": {},
+  "overall": {
+    "count": 60,
+    "seeded_positive": 50,
+    "intended_clean": 10,
+    "natural_unlabeled": 0,
+    "candidate_videos": 50,
+    "priority_a_videos": 0,
+    "source_lane_recall": 1.0,
+    "audio_lane_recall": 1.0,
+    "seeded_any_recall": 1.0,
+    "priority_a_recall": 0.0,
+    "intended_clean_flag_rate": 0.0,
+    "seeded_precision_proxy": 1.0,
+    "priority_a_precision_proxy": null,
+    "natural_candidate_rate": null,
+    "by_group": {
+      "challenge_audio_letter": {
+        "count": 10,
+        "candidate_rate": 1.0,
+        "a_rate": 0.0
+      },
+      "challenge_audio_number": {
+        "count": 10,
+        "candidate_rate": 1.0,
+        "a_rate": 0.0
+      },
+      "challenge_audio_operator": {
+        "count": 10,
+        "candidate_rate": 1.0,
+        "a_rate": 0.0
+      },
+      "challenge_audio_unit": {
+        "count": 10,
+        "candidate_rate": 1.0,
+        "a_rate": 0.0
+      },
+      "challenge_clean": {
+        "count": 10,
+        "candidate_rate": 0.0,
+        "a_rate": 0.0
+      },
+      "challenge_source_missing": {
+        "count": 10,
+        "candidate_rate": 1.0,
+        "a_rate": 0.0
+      }
+    }
+  },
+  "splits": {
+    "calibration": {
+      "count": 0,
+      "seeded_positive": 0,
+      "intended_clean": 0,
+      "natural_unlabeled": 0,
+      "candidate_videos": 0,
+      "priority_a_videos": 0,
+      "source_lane_recall": null,
+      "audio_lane_recall": null,
+      "seeded_any_recall": null,
+      "priority_a_recall": null,
+      "intended_clean_flag_rate": null,
+      "seeded_precision_proxy": null,
+      "priority_a_precision_proxy": null,
+      "natural_candidate_rate": null,
+      "by_group": {}
+    },
+    "holdout": {
+      "count": 60,
+      "seeded_positive": 50,
+      "intended_clean": 10,
+      "natural_unlabeled": 0,
+      "candidate_videos": 50,
+      "priority_a_videos": 0,
+      "source_lane_recall": 1.0,
+      "audio_lane_recall": 1.0,
+      "seeded_any_recall": 1.0,
+      "priority_a_recall": 0.0,
+      "intended_clean_flag_rate": 0.0,
+      "seeded_precision_proxy": 1.0,
+      "priority_a_precision_proxy": null,
+      "natural_candidate_rate": null,
+      "by_group": {
+        "challenge_audio_letter": {
+          "count": 10,
+          "candidate_rate": 1.0,
+          "a_rate": 0.0
+        },
+        "challenge_audio_number": {
+          "count": 10,
+          "candidate_rate": 1.0,
+          "a_rate": 0.0
+        },
+        "challenge_audio_operator": {
+          "count": 10,
+          "candidate_rate": 1.0,
+          "a_rate": 0.0
+        },
+        "challenge_audio_unit": {
+          "count": 10,
+          "candidate_rate": 1.0,
+          "a_rate": 0.0
+        },
+        "challenge_clean": {
+          "count": 10,
+          "candidate_rate": 0.0,
+          "a_rate": 0.0
+        },
+        "challenge_source_missing": {
+          "count": 10,
+          "candidate_rate": 1.0,
+          "a_rate": 0.0
+        }
+      }
+    }
+  },
+  "by_length": {
+    "short": {
+      "count": 24,
+      "seeded_positive": 20,
+      "intended_clean": 4,
+      "natural_unlabeled": 0,
+      "candidate_videos": 20,
+      "priority_a_videos": 0,
+      "source_lane_recall": 1.0,
+      "audio_lane_recall": 1.0,
+      "seeded_any_recall": 1.0,
+      "priority_a_recall": 0.0,
+      "intended_clean_flag_rate": 0.0,
+      "seeded_precision_proxy": 1.0,
+      "priority_a_precision_proxy": null,
+      "natural_candidate_rate": null,
+      "by_group": {
+        "challenge_audio_letter": {
+          "count": 4,
+          "candidate_rate": 1.0,
+          "a_rate": 0.0
+        },
+        "challenge_audio_number": {
+          "count": 4,
+          "candidate_rate": 1.0,
+          "a_rate": 0.0
+        },
+        "challenge_audio_operator": {
+          "count": 4,
+          "candidate_rate": 1.0,
+          "a_rate": 0.0
+        },
+        "challenge_audio_unit": {
+          "count": 4,
+          "candidate_rate": 1.0,
+          "a_rate": 0.0
+        },
+        "challenge_clean": {
+          "count": 4,
+          "candidate_rate": 0.0,
+          "a_rate": 0.0
+        },
+        "challenge_source_missing": {
+          "count": 4,
+          "candidate_rate": 1.0,
+          "a_rate": 0.0
+        }
+      }
+    },
+    "medium": {
+      "count": 18,
+      "seeded_positive": 15,
+      "intended_clean": 3,
+      "natural_unlabeled": 0,
+      "candidate_videos": 15,
+      "priority_a_videos": 0,
+      "source_lane_recall": 1.0,
+      "audio_lane_recall": 1.0,
+      "seeded_any_recall": 1.0,
+      "priority_a_recall": 0.0,
+      "intended_clean_flag_rate": 0.0,
+      "seeded_precision_proxy": 1.0,
+      "priority_a_precision_proxy": null,
+      "natural_candidate_rate": null,
+      "by_group": {
+        "challenge_audio_letter": {
+          "count": 3,
+          "candidate_rate": 1.0,
+          "a_rate": 0.0
+        },
+        "challenge_audio_number": {
+          "count": 3,
+          "candidate_rate": 1.0,
+          "a_rate": 0.0
+        },
+        "challenge_audio_operator": {
+          "count": 3,
+          "candidate_rate": 1.0,
+          "a_rate": 0.0
+        },
+        "challenge_audio_unit": {
+          "count": 3,
+          "candidate_rate": 1.0,
+          "a_rate": 0.0
+        },
+        "challenge_clean": {
+          "count": 3,
+          "candidate_rate": 0.0,
+          "a_rate": 0.0
+        },
+        "challenge_source_missing": {
+          "count": 3,
+          "candidate_rate": 1.0,
+          "a_rate": 0.0
+        }
+      }
+    },
+    "long": {
+      "count": 18,
+      "seeded_positive": 15,
+      "intended_clean": 3,
+      "natural_unlabeled": 0,
+      "candidate_videos": 15,
+      "priority_a_videos": 0,
+      "source_lane_recall": 1.0,
+      "audio_lane_recall": 1.0,
+      "seeded_any_recall": 1.0,
+      "priority_a_recall": 0.0,
+      "intended_clean_flag_rate": 0.0,
+      "seeded_precision_proxy": 1.0,
+      "priority_a_precision_proxy": null,
+      "natural_candidate_rate": null,
+      "by_group": {
+        "challenge_audio_letter": {
+          "count": 3,
+          "candidate_rate": 1.0,
+          "a_rate": 0.0
+        },
+        "challenge_audio_number": {
+          "count": 3,
+          "candidate_rate": 1.0,
+          "a_rate": 0.0
+        },
+        "challenge_audio_operator": {
+          "count": 3,
+          "candidate_rate": 1.0,
+          "a_rate": 0.0
+        },
+        "challenge_audio_unit": {
+          "count": 3,
+          "candidate_rate": 1.0,
+          "a_rate": 0.0
+        },
+        "challenge_clean": {
+          "count": 3,
+          "candidate_rate": 0.0,
+          "a_rate": 0.0
+        },
+        "challenge_source_missing": {
+          "count": 3,
+          "candidate_rate": 1.0,
+          "a_rate": 0.0
+        }
+      }
+    }
+  },
+  "truth_note": "注入标签只证明输入/旁白被人为改动，不自动证明最终音频真实读错；自然风险样本无预设真假，需人工核听。"
+}

@@ -1,60 +1,17 @@
-# 架构说明
+# DEV-PB2 模块结构
 
-## 处理链路
+核心包 `src/dev_pb2/` 只保留本轮 600 条样本实测需要的能力：
 
-```text
-最终视频 + 冻结期望旁白
-  ├─ transcript lane
-  │    ├─ faster-whisper分段转写
-  │    ├─ 同音归一化后的全文相似度
-  │    └─ 英文、字母和高风险片段候选
-  └─ pronunciation lane（可选）
-       ├─ G2PW/短语词典确定语境期望读音
-       ├─ phonetic模型分析实际声学证据
-       └─ 多时间窗多数投票
-  → JSON逐条结果
-  → summary + HTML人工复核
-```
+- `manifest.py`：一次筛查的资源输入校验；
+- `qwen_asr.py`：最终视频音轨的分段 ASR 与时间点；
+- `semantic_review.py`：最终源码旁白缺漏、源码与实际读法差异；
+- `literal_asr.py` / `literal_reading.py`：函数记号被机械念出括号的定向补查；
+- `screening_report.py`：证据归并和候选清单；
+- `pipeline.py`：独立运行与 `clean/candidate/failed_open` 合同；
+- `decisions.py`：管理员通过或确认修复后的确定性命令；
+- `synthetic_*`：600 条合成样本构造、TTS 生成与量化；
+- `review_server.py`：可选的原有人工核听页，不承担 BatchOps 正式交付动作。
 
-## 事实边界
+数据目录按输入指纹创建，每个阶段逐条保存 JSON，可续跑；视频、源码、模型结果和人工命令用 revision 与 SHA 关联。证据不完整时输出 `failed_open`，不把未检测解释成正常。筛查器不修改视频、源码或 BatchOps 的工作流状态。
 
-三个事实不能混为一谈：
-
-1. `transcript` 说明ASR听到了什么，不能单独证明某个汉字声调错误；
-2. `pronunciation` 比较期望读音与声学证据，仍可能受切词、轻声和变调影响；
-3. 人工结论才是业务复核结果，不能反向覆盖原始机器证据。
-
-## 结果合同
-
-每次检测保存：
-
-- detector版本、模型名、音频时长、推理耗时和实时系数；
-- finding ID、类型、严重度、开始/结束毫秒、转写片段和原因；
-- required lanes、completed lanes和missing lanes；
-- `failed_open`与“完成且无候选”必须分开。
-
-单条finding和单任务finding数量有上限，避免报告或数据库无限膨胀。
-
-## 接入生产批处理系统
-
-推荐在成片上传并取得SHA后异步投递，主渲染流程不等待检测：
-
-```text
-Render上传成片
-→ Transactional Outbox
-→ Audio Inspection Worker claim/lease
-→ 校验输入SHA并检测
-→ 上传不可变结果bundle
-→ 控制面保存摘要和artifact引用
-→ 人工复核页面
-```
-
-生产请求至少携带tenant、generation、job、attempt、视频URI/SHA、期望文本URI/SHA、lane、检测器版本和幂等键。完整转写放对象存储，业务数据库只保存有界摘要和artifact引用。
-
-## 禁止事项
-
-- 不因口音、多音字或英文候选阻断已有可播放成片；
-- 不在每个渲染容器重复加载STT模型；
-- 不从不受信任的任意路径读取文件；
-- 不把服务不可用或空结果写成检测通过；
-- 不把历史样本精度直接外推到新的TTS供应商、音色和年级。
+正式视频重做建议使用确定性 BatchOps 编排，参见[接入合同](batchops-integration.md)。历史多音字声学检测、通用 MFA 分析和旧 CLI 已从 DEV-PB2 当前代码移除，但仍可在本仓库 Git 历史的 `main` 分支追溯。
