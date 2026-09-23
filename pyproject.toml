@@ -22,6 +22,8 @@ dev = [
 
 [project.scripts]
 dev-pb2 = "dev_pb2.cli:main"
+dev-pb2-close-loop = "dev_pb2.closure:main"
+dev-pb2-rebuild = "dev_pb2.repair_media:main"
 dev-pb2-qwen-asr = "dev_pb2.qwen_asr:main"
 dev-pb2-semantic-review = "dev_pb2.semantic_review:main"
 dev-pb2-screening-report = "dev_pb2.screening_report:main"

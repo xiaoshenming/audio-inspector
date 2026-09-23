@@ -70,15 +70,21 @@ def _transcribe_targeted(model, record: dict, clips: list[dict]) -> list[dict]:
 def run_batch(manifest: Path, output: Path, model_name: str = "small",
               cpu_threads: int = 4, limit: int | None = None,
               targeted: bool = False, max_clips: int = 3) -> dict:
-    from faster_whisper import WhisperModel
-
     rows = load_manifest(manifest)
     if limit is not None:
         rows = rows[:limit]
     items = output / "items"
     items.mkdir(parents=True, exist_ok=True)
-    model = WhisperModel(model_name, device="cpu", compute_type="int8",
-                         cpu_threads=cpu_threads)
+    model = None
+
+    def get_model():
+        nonlocal model
+        if model is None:
+            from faster_whisper import WhisperModel
+
+            model = WhisperModel(model_name, device="cpu", compute_type="int8",
+                                 cpu_threads=cpu_threads)
+        return model
     results = []
     started = time.monotonic()
     for row in rows:
@@ -94,10 +100,10 @@ def run_batch(manifest: Path, output: Path, model_name: str = "small",
                 continue
         try:
             if targeted:
-                spans = _transcribe_targeted(model, row, clips) if clips else []
+                spans = _transcribe_targeted(get_model(), row, clips) if clips else []
                 duration = sum(clip["end_seconds"] - clip["start_seconds"] for clip in clips)
             else:
-                segments, info = model.transcribe(row["video_path"], language="zh",
+                segments, info = get_model().transcribe(row["video_path"], language="zh",
                                                   vad_filter=False)
                 spans = [{"start_ms": round(float(segment.start) * 1000),
                           "end_ms": round(float(segment.end) * 1000),

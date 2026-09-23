@@ -51,10 +51,22 @@ dev-pb2 decide --inspection /private/run/inspection.json \
 
 `edits.json` 为 `[ {"issue_id":"...", "new_text":"管理员最终指定的文字"} ]`。要放行则使用 `--action accept_as_is`，无需 `--edits`。修复命令会带原视频/源码 SHA、版本号、管理员、幂等键及逐行口播替换；源码版本变化或问题 ID 不匹配会拒绝生成过期命令。详见[BatchOps 接入合同](docs/batchops-integration.md)。
 
+对有原始未烧字幕视频、且批准修改能唯一对应字幕时间窗的任务，可由模块直接执行一次完整测试闭环：
+
+```bash
+dev-pb2-close-loop --request request.json --work-root /private/dev-pb2-runs \
+  --unburned /private/final.unburned.mp4 --source-pack /private/source.tar \
+  --actor admin-42 --edits edits.json --output /private/pb2-closure
+```
+
+该命令只使用管理员批准的文字修改源码包；然后重配对应句子的音、保持原画面时长并重做字幕，输出完整 MP4，最后再次运行全部筛查。新的音轨若需大幅加速或放慢，模块会明确要求走 BatchOps 的完整场景重渲染，不会强行拼接不自然的配音。测试闭环不向客户发布视频。
+
 ## 筛查内容与数据
 
 筛查包含 Qwen ASR 听写、DeepSeek 源码旁白审查、源码与 ASR 差异审查，以及针对 `f(x)` 被念出“左括号……右括号”的定向逐字听写。多音字旧链路已从此分支移除。[筛查流程](docs/screening-workflow.md)保留每一阶段的独立运行命令。
 
 本分支继承此前全部 Git 提交历史，同时在本地 `input/synthetic-tts-20260923/` 与 `input/synthetic-tts-challenge-20260923/` 保存 600 条合成样本及报告，合计约 846 MB。媒体和可能含内部路径的报告被 Git 忽略；交给同事时需**连同样本包单独传送**。结论和样本限制见[量化记录](docs/synthetic-benchmark.md)。
+
+已在 B2B 服务器的隔离目录用 152 条真实终审视频中的一条完成“检出 → 人工确认文字 → 重配音并成片 → 再筛查”，详见[真实样本闭环回执](docs/real-152-closure.md)。
 
 开发检查：`python -m pytest && python -m ruff check src tests && python -m compileall -q src tests`。
