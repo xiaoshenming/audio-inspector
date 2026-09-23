@@ -164,9 +164,10 @@ def render_full(source_pack: Path, source_main: Path, item_id: str,
 
 
 def render_and_inspect(request: dict, source_pack: Path, source_main: Path,
-                       output: Path, work_root: Path) -> dict:
+                       output: Path, work_root: Path,
+                       job_item_id: str | None = None) -> dict:
     output.mkdir(parents=True, exist_ok=True)
-    rendered = render_full(source_pack, source_main, request["item_id"], output)
+    rendered = render_full(source_pack, source_main, job_item_id or request["item_id"], output)
     revised_request = {**request, "revision_id": request["revision_id"]
                        + ":worker:" + rendered["render_job_id"],
                        "video_path": rendered["video_path"],

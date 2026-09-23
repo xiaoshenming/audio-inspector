@@ -23,3 +23,9 @@
 本例使用已有的未烧字幕原片，属于**局部重配音并重合成完整视频**，无需启动 Manim 子节点。它证明此类时间窗清楚、文字改动很小的问题可以在独立模块里闭环；对于画面需改变、没有未烧字幕原片、音频时长差异过大的样本，仍需接 BatchOps 最新渲染子节点做完整场景重渲染。该通道尚未接线，不得把本次结果外推为所有 152 条都能自动修复。
 
 本地可播放文件与详细回执位于 Git 忽略的 `input/real-152-closure-20260923/`。B2B 服务器隔离回执位于 `/var/lib/mathpi/dev-pb2-closure/closure-2b03/closure.json`；没有向客户发布。
+
+## 2026-09-24：按独立会话接口重走管理员循环
+
+用新 `dev-pb2-cycle` 接口在 B2B 隔离目录对同一原始样本执行 `start → decide approve_repair → status → decide accept_as_is`，没有人工改写源码文件或手工合成视频。第一次状态为 `awaiting_admin/candidate`，问题仍是漏读向量 a；管理员动作指定“已知向量 a 与 b 不共线”。模块自动生成新的 19.900 秒完整 MP4，源码、字幕都包含批准的文字，TTS 回执记录了 1 段重配音，复筛为 `clean`。**复筛 clean 后的会话仍处于 `awaiting_admin`，未自动放行**；第二次管理员动作才使其成为 `release_ready`。最终文件存在，视频 SHA 与放行建议一致；正式客户交付没有执行。
+
+会话与全部证据位于 `/var/lib/mathpi/dev-pb2-closure/review-cycle-2b03/cycle.json`、`round-1/repaired/`，可以用 `dev-pb2-cycle status --session /var/lib/mathpi/dev-pb2-closure/review-cycle-2b03` 读取简明状态。该实例只证明“发现 → 人工改文 → 重配完整视频 → 复筛 → 再人工确认”的接口闭环；其他样本仍需按其资源选择局部重配音或子节点重渲染。

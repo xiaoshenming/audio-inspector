@@ -24,6 +24,7 @@ dev = [
 [project.scripts]
 dev-pb2 = "dev_pb2.cli:main"
 dev-pb2-close-loop = "dev_pb2.closure:main"
+dev-pb2-cycle = "dev_pb2.review_cycle:main"
 dev-pb2-batch-eval = "dev_pb2.batch_eval:main"
 dev-pb2-prepare-shortlist = "dev_pb2.shortlist:main"
 dev-pb2-iterate = "dev_pb2.iterate:main"

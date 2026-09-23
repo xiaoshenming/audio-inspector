@@ -53,6 +53,27 @@ BatchOps 消费 `rebuild_final_video` 时应按幂等键只创建一次**新**�
 
 当前分支实现了独立筛查、结果合同、人工决定命令，以及针对有未烧字幕原片和唯一字幕时间窗的**局部重配音成片闭环**。该执行器保存新源码包、修正字幕、重配音证据、完整 MP4 和再次筛查结果。局部重配音只适用于时间窗明确且音频时长变化较小的修改；否则返回“需要完整场景重渲染”，不能把它当成通用 Manim 替代品。
 
+## 独立循环接口
+
+`dev-pb2-cycle` 是给接入方或 Codex 调用的独立会话接口，不会发送视频给客户：
+
+```bash
+dev-pb2-cycle start --request request.json --session /path/to/session \
+  --work-root /path/to/work --unburned unburned.mp4 --source-pack source.tar
+dev-pb2-cycle status --session /path/to/session
+dev-pb2-cycle retry --session /path/to/session  # 仅 inspection_failed 时
+dev-pb2-cycle decide --session /path/to/session --actor admin-id \
+  --action approve_repair --edits edits.json
+dev-pb2-cycle decide --session /path/to/session --actor admin-id \
+  --action accept_as_is
+```
+
+`start` 对初筛 `clean` 返回 `phase=release_ready`；`candidate` 返回 `phase=awaiting_admin`、问题列表、可播放视频路径与原文/建议新文。管理员选择 `accept_as_is` 后，返回绑定当前 revision 和视频 SHA 的 `release_ready`；选择 `approve_repair` 后，模块按照管理员确认的文字重新配音、生成完整 MP4、重新筛查，并**总是**回到 `awaiting_admin`。管理员可以重复修改或放行；即使机器复筛为 `clean`，新视频仍要经管理员确认。`failed_open` 返回 `inspection_failed`，不得当作通过。
+
+`edits.json` 可以用 `[{"issue_id":"...","new_text":"..."}]` 接受或改写建议。复筛未报疑点但管理员听出新问题时，也可以用 `[{"source_line":123,"old_voiceover":"完整旧旁白","new_voiceover":"完整新旁白"}]` 指定准确口播；模块校验源码中的旧文唯一匹配。每轮决定、旧/新 SHA、TTS 产物和复筛证据保留在会话目录。重复提交已完成的决定会被状态拒绝，不会再次触发 TTS。`release_ready` 只是对外输出的交付建议与文件身份，正式客户放行仍由 BatchOps 原有权限流程执行。
+
+默认 `--repair-mode local` 使用未烧字幕原片与源码包进行局部重配音。需要完整场景重渲染时，`start` 改用 `--repair-mode worker --source-pack source.tar`，走独立 Render 子节点，随后同样回到管理员确认点。两种执行模式的会话输出协议一致；后者需要前述 BatchOps 子节点适配器环境变量。
+
 对于需要完整场景重渲染的样本，可选安装 `.[batchops]`，由 `dev-pb2-worker-render` 使用修复后源码包向 BatchOps Render 控制面提交**独立测试任务**，让现有最新子节点完成正式 TTS 与完整 Manim 视频渲染；模块按签名上传合同取回 MP4、字幕并再次筛查。此适配器以环境变量接收控制面 URL、Intake 签名入口、TOS 和租户凭据，不把密钥写入仓库。它在隔离测试中已成功出片并复筛；仍需由同事决定如何映射到正式任务版本、权限和审计。
 
 BatchOps 的前端按钮、客户任务持久状态、正式交付授权和 COS/TOS 输入适配**尚未接线**。接线时应在 BatchOps 自己的仓库测试与部署，不要把这个隔离基线误当成已上线的客户交付流程。

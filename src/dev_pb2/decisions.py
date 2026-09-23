@@ -25,6 +25,23 @@ def _replacement(source: Path, issue: dict, new_text: str) -> dict:
                      else issue["repair_mode"]), "issue_id": issue["issue_id"]}
 
 
+def _manual_replacement(source: Path, edit: dict) -> dict:
+    """Let an administrator correct a line the screening model did not flag."""
+    old = str(edit.get("old_voiceover") or "")
+    new = str(edit.get("new_voiceover") or "").strip()
+    line_number = edit.get("source_line")
+    if not old or not new or len(new) > 2000 or old == new:
+        raise ValueError("manual_voiceover_requires_distinct_old_and_new_text")
+    lines = voiceovers(source.read_text(encoding="utf-8"))
+    matches = [line for line in lines if line["text"] == old
+               and (line_number is None or line["line"] == line_number)]
+    if len(matches) != 1:
+        raise ValueError("manual_voiceover_target_not_unique")
+    return {"source_line": matches[0]["line"], "old_voiceover": old,
+            "new_voiceover": new, "mode": "replace_voiceover_text",
+            "issue_ids": []}
+
+
 def decide(inspection: dict, source_path: Path, actor: str, action: str,
            edits: list[dict] | None = None, note: str = "") -> dict:
     if inspection.get("schema_version") != "dev-pb2.inspection.v1":
@@ -43,12 +60,18 @@ def decide(inspection: dict, source_path: Path, actor: str, action: str,
         changes: list[dict] = []
         next_action = "continue_delivery"
     elif action == "approve_repair":
-        if inspection["status"] != "candidate" or not edits:
-            raise ValueError("repair_requires_candidates_and_edits")
+        if not edits:
+            raise ValueError("repair_requires_edits")
         known = {issue["issue_id"]: issue for issue in inspection["issues"]}
         seen: set[str] = set()
         by_line: dict[int, dict] = {}
         for edit in edits:
+            if "old_voiceover" in edit:
+                change = _manual_replacement(source, edit)
+                if change["source_line"] in by_line:
+                    raise ValueError("overlapping_voiceover_edits")
+                by_line[change["source_line"]] = change
+                continue
             issue_id = str(edit.get("issue_id") or "")
             if issue_id not in known or issue_id in seen:
                 raise ValueError("unknown_or_duplicate_issue")

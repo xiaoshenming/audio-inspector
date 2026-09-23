@@ -12,7 +12,7 @@
 | `candidate` | 找到值得核听的疑点 | `needs_admin_review=true`，显示时间点和文字对照 |
 | `failed_open` | 请求失败或证据不完整 | 告知管理员“尚未完成筛查”，不能显示成“没问题” |
 
-对候选，管理员可以选择“没问题，继续交付”或“确认修复并重做”；第二种操作允许逐条修改建议新文。模块只输出带版本与 SHA 的确定性 `voiceover_overrides` 和 `rebuild_final_video` 命令。真正的 TTS 请求、视频重合成、重新审查以及最终发送仍由 BatchOps 编排。AI 只提出疑点和文字建议，不能擅自确认修复或释放给客户。
+对候选，管理员可以选择“没问题，继续交付”或“确认修复并重做”；第二种操作允许逐条修改建议新文。`dev-pb2-cycle` 把筛查、管理员决定、实际重配音、完整 MP4、复筛与再次等待管理员确认串成独立循环。最终发送仍由 BatchOps 编排。AI 只提出疑点和文字建议，不能擅自确认修复或释放给客户。
 
 ## 安装和运行
 
@@ -52,6 +52,8 @@ dev-pb2 decide --inspection /private/run/inspection.json \
 ```
 
 `edits.json` 为 `[ {"issue_id":"...", "new_text":"管理员最终指定的文字"} ]`。要放行则使用 `--action accept_as_is`，无需 `--edits`。修复命令会带原视频/源码 SHA、版本号、管理员、幂等键及逐行口播替换；源码版本变化或问题 ID 不匹配会拒绝生成过期命令。详见[BatchOps 接入合同](docs/batchops-integration.md)。
+
+需要完整的人机循环时，调用 `dev-pb2-cycle start/status/decide`。首轮无疑点返回 `release_ready`；有疑点返回 `awaiting_admin`；管理员确认修改后模块生成新成片并复筛，**即使复筛为 clean 也再次返回 `awaiting_admin`**，直到管理员决定放行。完整命令和返回协议见[BatchOps 接入合同](docs/batchops-integration.md)。
 
 对有原始未烧字幕视频、且批准修改能唯一对应字幕时间窗的任务，可由模块直接执行一次完整测试闭环：
 
