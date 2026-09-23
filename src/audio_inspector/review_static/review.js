@@ -1,5 +1,6 @@
 const state={items:[],reviews:[],selected:null,reviewer:localStorage.getItem("audio-screening-reviewer")||""};
 const label={correct:"正确",missing:"漏字",incorrect:"不正确",uncertain:"待定"};
+const issueLabel={source_missing_object:"旁白缺少对象",source_wrong_expression:"原始表述有误",source_literal_tex:"原始文本含公式指令",audio_missing_object:"疑似少读对象",audio_wrong_operator:"疑似运算符读错",audio_wrong_number:"疑似数字读错",audio_wrong_unit:"疑似单位读错",audio_wrong_letter:"疑似字母读错",audio_other:"其他疑似读错"};
 const reviewer=document.querySelector("#reviewer");reviewer.value=state.reviewer;
 reviewer.addEventListener("change",()=>{state.reviewer=reviewer.value.trim();localStorage.setItem("audio-screening-reviewer",state.reviewer);render()});
 for(const id of ["tier","verdict","kind","search"])document.querySelector(`#${id}`).addEventListener("input",renderItems);
@@ -15,7 +16,7 @@ function visible(item){const tier=document.querySelector("#tier").value,verdict=
 function renderItems(){const root=document.querySelector("#items");root.replaceChildren();let count=0;
   for(const item of state.items){if(!visible(item))continue;count++;
     const button=node("button",`item ${item.item_id===state.selected?"active":""}`);
-    button.append(node("strong","",item.external_key),node("small","",`${item.batch_name} · ${Math.round(item.duration_seconds)} 秒 · `));
+    button.append(node("strong","",item.external_key),node("small","",`${item.batch_name} · ${Math.round(item.duration_seconds)} 秒 · ${item.item_id.slice(0,8)} · `));
     button.append(node("span",`tag ${item.priority==="A"?"a":""}`,`${item.priority} 级`));
     const verdict=myReview(`video:${item.item_id}`)?.verdict;
     if(verdict)button.append(node("span",`tag ${verdict}`,` ${label[verdict]}`));
@@ -27,7 +28,7 @@ function actionBox(item,target){const box=node("article","review-target");box.da
     const button=node("button",mine?.verdict===value?"selected":"",title);button.type="button";
     button.addEventListener("click",()=>save(item,target,value,box));actions.append(button)}
   const saved=node("span","saved",mine?`已保存：${label[mine.verdict]} · ${mine.reviewer}`:"");actions.append(saved);box.append(actions);return box}
-function issueCard(item,issue){const box=actionBox(item,issue.issue_id);const head=node("h3","",`${issue.kind==="source"?"原始旁白缺漏":"成片疑似读错"} · ${issue.category||""}`);box.prepend(head);
+function issueCard(item,issue){const box=actionBox(item,issue.issue_id);const head=node("h3","",`${issue.kind==="source"?"原始旁白缺漏":"成片疑似读错"} · ${issueLabel[issue.category]||issue.category||""}`);box.prepend(head);
   box.insertBefore(node("p","issue-meta",`${issue.line?`源码第 ${issue.line} 行 · `:""}${issue.confidence||"待核"} · 自动候选，须人工听/看`),box.querySelector("textarea"));
   box.insertBefore(node("p","source-text",`原始旁白：${issue.source_quote||""}`),box.querySelector("textarea"));
   if(issue.asr_quote)box.insertBefore(node("p","asr-text",`ASR 转写：${issue.asr_quote}`),box.querySelector("textarea"));
@@ -36,7 +37,7 @@ function issueCard(item,issue){const box=actionBox(item,issue.issue_id);const he
   const seek=node("button","seek",issue.time_seconds==null?"从头播放":`跳到 ${Number(issue.time_seconds).toFixed(1)} 秒核听`);
   seek.type="button";seek.addEventListener("click",()=>seekTo(issue.time_seconds||0));box.insertBefore(seek,box.querySelector("textarea"));return box}
 function renderDetail(){const item=state.items.find(x=>x.item_id===state.selected),root=document.querySelector("#detail");root.replaceChildren();if(!item){root.append(node("div","empty","请选择左侧一条视频开始复审。"));return}
-  const playerBox=node("div","player-box"),head=node("div","detail-head"),info=node("div");info.append(node("h2","",item.external_key),node("p","",`${item.batch_name} · ${item.priority} 级 · ${Math.round(item.duration_seconds)} 秒`));head.append(info);playerBox.append(head);
+  const playerBox=node("div","player-box"),head=node("div","detail-head"),info=node("div");info.append(node("h2","",item.external_key),node("p","",`${item.batch_name} · ${item.priority} 级 · ${Math.round(item.duration_seconds)} 秒 · 题目 ${item.item_id.slice(0,8)}`));head.append(info);playerBox.append(head);
   const video=node("video");video.id="player";video.controls=true;video.preload="metadata";video.src=`/media/${encodeURIComponent(item.item_id)}.mp4`;playerBox.append(video,node("p","hint","点击下方时间按钮可跳到问题前约 2 秒。红字是源码原文，橙字是 ASR 候选；请以实际听到的视频为准。"));root.append(playerBox);
   const overall=actionBox(item,`video:${item.item_id}`);overall.prepend(node("h3","","整条视频的结论"));root.append(overall);
   if(item.triage_note)root.append(node("p","hint",`交叉核对：${item.triage_note}`));
