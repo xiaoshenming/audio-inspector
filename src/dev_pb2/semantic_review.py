@@ -75,18 +75,22 @@ def _request(system: str, data: dict, key: str) -> tuple[dict, dict]:
     payload = {"model": MODEL, "max_tokens": 2200, "temperature": 0,
                "thinking": {"type": "disabled"}, "system": system,
                "messages": [{"role": "user", "content": json.dumps(data, ensure_ascii=False)}]}
-    request = urllib.request.Request(
-        ENDPOINT, data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        method="POST", headers={"x-api-key": key, "anthropic-version": "2023-06-01",
-                                "content-type": "application/json"},
-    )
     for attempt in range(4):
+        payload["max_tokens"] = 2200 if attempt == 0 else 4000
+        request = urllib.request.Request(
+            ENDPOINT, data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            method="POST", headers={"x-api-key": key, "anthropic-version": "2023-06-01",
+                                    "content-type": "application/json"},
+        )
         try:
             with urllib.request.urlopen(request, timeout=180) as response:
                 result = json.load(response)
             text = "".join(row.get("text", "") for row in result.get("content") or []
                            if row.get("type") == "text")
             return _model_json(text), result.get("usage") or {}
+        except (ValueError, TypeError) as exc:
+            if attempt == 3:
+                raise RuntimeError("deepseek_invalid_json_after_retries") from exc
         except urllib.error.HTTPError as exc:
             if exc.code not in {429, 500, 502, 503, 504} or attempt == 3:
                 raise RuntimeError(f"deepseek_http_{exc.code}:{exc.read(200).decode(errors='replace')}") from exc

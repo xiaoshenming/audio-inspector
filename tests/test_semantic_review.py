@@ -8,6 +8,26 @@ from dev_pb2.semantic_review import (
 )
 
 
+def test_deepseek_retries_malformed_json_without_losing_task(monkeypatch):
+    import io
+    import json
+
+    from dev_pb2 import semantic_review
+
+    responses = iter(["{invalid", '{"issues":[]}'])
+
+    def urlopen(request, timeout):
+        text = next(responses)
+        payload = {"content": [{"type": "text", "text": text}], "usage": {}}
+        return io.BytesIO(json.dumps(payload).encode())
+
+    monkeypatch.setattr(semantic_review.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(semantic_review.time, "sleep", lambda _: None)
+    result, usage = semantic_review._request("system", {"question": "x"}, "fake")
+    assert result == {"issues": []}
+    assert usage == {}
+
+
 def test_voiceover_literals_keep_source_line_numbers():
     source = 'class Scene:\n    def construct(self):\n        with self.voiceover(text="已知向量与 b 不共线"):\n            pass\n'
     assert voiceovers(source) == [{"line": 3, "text": "已知向量与 b 不共线"}]

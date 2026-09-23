@@ -142,7 +142,8 @@ def run(request: dict, work_root: Path) -> dict:
         manifest, root / "semantic-audio", "audio", os.environ["DEEPSEEK_API_KEY"],
         asr_dir=root / "asr-qwen", source_review_dir=root / "semantic-source"))
     stage("literal-asr-targeted", lambda: literal_asr.run_batch(
-        manifest, root / "literal-asr-targeted", targeted=True))
+        manifest, root / "literal-asr-targeted",
+        model_name=os.environ.get("DEV_PB2_WHISPER_MODEL", "small"), targeted=True))
     stage("literal-reading", lambda: literal_reading.run_batch(
         manifest, root / "literal-asr-targeted", root / "literal-reading"))
     return publish(root)

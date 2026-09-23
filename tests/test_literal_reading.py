@@ -2,6 +2,25 @@ from dev_pb2.literal_asr import target_clips
 from dev_pb2.literal_reading import detect_one
 
 
+def test_targeted_asr_without_function_notation_skips_model_load(tmp_path, monkeypatch):
+    import json
+
+    from dev_pb2 import literal_asr
+
+    video = tmp_path / "video.mp4"
+    video.write_bytes(b"not used when no target clips")
+    source = tmp_path / "main.py"
+    source.write_text('self.voiceover(text="已知向量 a 与 b 不共线")\n')
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(json.dumps({"items": [{"item_id": "one",
+        "video_path": str(video), "source_path": str(source)}]}))
+    monkeypatch.setattr(literal_asr, "_shared_model",
+                        lambda *args: (_ for _ in ()).throw(AssertionError("model loaded")))
+    summary = literal_asr.run_batch(manifest, tmp_path / "literal", targeted=True)
+    assert summary["completed"] == 1
+    assert summary["clips_transcribed"] == 0
+
+
 def test_raw_fx_spoken_as_left_and_right_bracket_is_candidate(tmp_path):
     source = tmp_path / "main.py"
     source.write_text('class Scene:\n    def construct(self):\n'

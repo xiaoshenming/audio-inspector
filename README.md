@@ -61,6 +61,8 @@ dev-pb2-close-loop --request request.json --work-root /private/dev-pb2-runs \
 
 该命令只使用管理员批准的文字修改源码包；然后重配对应句子的音、保持原画面时长并重做字幕，输出完整 MP4，最后再次运行全部筛查。新的音轨若需大幅加速或放慢，模块会明确要求走 BatchOps 的完整场景重渲染，不会强行拼接不自然的配音。测试闭环不向客户发布视频。
 
+需要完整渲染时，模块还提供可选的 `dev-pb2-worker-render` 子节点适配器：它提交独立 Render 测试任务，下载新成片并复筛。适配器额外安装 `.[batchops]`，凭据由调用方环境变量提供；它不会把测试视频释放给客户。65 条真实样本的批量试验由 `dev-pb2-prepare-shortlist`、`dev-pb2-batch-eval`、`dev-pb2-iterate`、`dev-pb2-worker-batch` 和 `dev-pb2-summary` 组成，逐条结果可续跑。
+
 ## 筛查内容与数据
 
 筛查包含 Qwen ASR 听写、DeepSeek 源码旁白审查、源码与 ASR 差异审查，以及针对 `f(x)` 被念出“左括号……右括号”的定向逐字听写。多音字旧链路已从此分支移除。[筛查流程](docs/screening-workflow.md)保留每一阶段的独立运行命令。

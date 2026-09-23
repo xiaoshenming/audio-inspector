@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 
+from .literal_phrasing import rewrite_function_notation
 from .semantic_review import voiceovers
 
 
@@ -20,7 +21,8 @@ def _replacement(source: Path, issue: dict, new_text: str) -> dict:
     line = candidates[0]
     return {"source_line": line["line"], "old_voiceover": line["text"],
             "new_voiceover": line["text"].replace(original, new_text, 1),
-            "mode": issue["repair_mode"], "issue_id": issue["issue_id"]}
+            "mode": ("replace_voiceover_text" if new_text != original
+                     else issue["repair_mode"]), "issue_id": issue["issue_id"]}
 
 
 def decide(inspection: dict, source_path: Path, actor: str, action: str,
@@ -59,10 +61,16 @@ def decide(inspection: dict, source_path: Path, actor: str, action: str,
             if line in by_line:
                 current = by_line[line]
                 original = known[issue_id]["original_text"]
-                if current["new_voiceover"].count(original) != 1:
-                    raise ValueError("overlapping_voiceover_edits")
-                current["new_voiceover"] = current["new_voiceover"].replace(
-                    original, proposed, 1)
+                if (known[issue_id]["category"] == "audio_literal_formula"
+                        and original == current["old_voiceover"]
+                        and proposed == rewrite_function_notation(original)):
+                    current["new_voiceover"] = rewrite_function_notation(
+                        current["new_voiceover"])
+                else:
+                    if current["new_voiceover"].count(original) != 1:
+                        raise ValueError("overlapping_voiceover_edits")
+                    current["new_voiceover"] = current["new_voiceover"].replace(
+                        original, proposed, 1)
                 current["issue_ids"].append(issue_id)
                 if change["mode"] == "replace_voiceover_text":
                     current["mode"] = change["mode"]

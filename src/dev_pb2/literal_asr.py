@@ -7,6 +7,7 @@ import hashlib
 import json
 import subprocess
 import tempfile
+import threading
 import time
 from pathlib import Path
 
@@ -14,6 +15,20 @@ from .literal_reading import FUNCTION, SPOKEN_BRACKET
 from .manifest import load_manifest
 from .semantic_review import _match, voiceovers
 from .subtitle_cues import cue_match_score, read_srt_cues
+
+_MODEL_CACHE: dict[tuple[str, int], object] = {}
+_MODEL_LOCK = threading.Lock()
+
+
+def _shared_model(name: str, cpu_threads: int):
+    key = name, cpu_threads
+    with _MODEL_LOCK:
+        if key not in _MODEL_CACHE:
+            from faster_whisper import WhisperModel
+
+            _MODEL_CACHE[key] = WhisperModel(name, device="cpu", compute_type="int8",
+                                             cpu_threads=cpu_threads)
+        return _MODEL_CACHE[key]
 
 
 def target_clips(record: dict, max_clips: int = 3) -> list[dict]:
@@ -75,16 +90,8 @@ def run_batch(manifest: Path, output: Path, model_name: str = "small",
         rows = rows[:limit]
     items = output / "items"
     items.mkdir(parents=True, exist_ok=True)
-    model = None
-
     def get_model():
-        nonlocal model
-        if model is None:
-            from faster_whisper import WhisperModel
-
-            model = WhisperModel(model_name, device="cpu", compute_type="int8",
-                                 cpu_threads=cpu_threads)
-        return model
+        return _shared_model(model_name, cpu_threads)
     results = []
     started = time.monotonic()
     for row in rows:
