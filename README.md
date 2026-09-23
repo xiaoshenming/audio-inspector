@@ -88,6 +88,8 @@ ssh -L 8765:127.0.0.1:8765 your-server-alias
 
 需要让同事在线保存人工结论时，可使用[受管理员会话保护的复审服务](docs/human-review-server.md)。
 
+需要用可复现的正负样本量化筛查完成率、注入缺陷检出率和误报率时，参见[合成 TTS 量化流程](docs/synthetic-benchmark.md)。
+
 ## 服务器部署
 
 部署、资源预检、持久批任务、报告访问和恢复方法见[服务器部署与验证](docs/server-deployment.md)。架构和接入生产批处理系统的边界见[架构说明](docs/architecture.md)。

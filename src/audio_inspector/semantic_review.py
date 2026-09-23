@@ -102,6 +102,19 @@ def _match(quote: object, text: str) -> bool:
     return len(compact(quote)) >= 2 and compact(quote) in compact(text)
 
 
+def actionable_source_issue(issue: dict) -> bool:
+    reason = str(issue.get("why") or "")
+    if issue.get("confidence") == "low":
+        return False
+    if re.search(r"不构成(?:缺陷|问题|错误)|无直接错误|本身正确|无错误|无误|"
+                 r"故不报|无法高置信|表述可通|数学上等价", reason):
+        return False
+    suggested = re.sub(r"\s+", "", str(issue.get("suggested_reading") or ""))
+    original = re.sub(r"\s+", "", str(issue.get("source_quote") or ""))
+    return not (issue.get("category") == "source_wrong_expression"
+                and suggested and suggested == original)
+
+
 def _spoken_canonical(value: object) -> str:
     text = str(value or "").lower().translate(str.maketrans("₀₁₂₃₄₅₆₇₈₉", "0123456789"))
     for old, new in (("下标零", "0"), ("下标一", "1"), ("下标二", "2"),
@@ -177,7 +190,8 @@ def review_one(row: dict, questions: dict, asr_items: dict, source_issues: dict,
         for issue in issues:
             if any(_match(issue.get("source_quote"), source_issue.get("source_quote", ""))
                    or _match(source_issue.get("source_quote"), issue.get("source_quote", ""))
-                   for source_issue in source_issues.get(item_id, [])):
+                   for source_issue in source_issues.get(item_id, [])
+                   if actionable_source_issue(source_issue)):
                 source_overlap += 1
             else:
                 retained.append(issue)

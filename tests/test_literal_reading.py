@@ -59,3 +59,16 @@ def test_latex_shell_is_matched_to_plain_subtitle(tmp_path):
         {"start_ms": 9000, "end_ms": 16000, "text": "求函数f左括号x右括号的单调区间"},
     ]}
     assert len(detect_one(record, asr)) == 1
+
+
+def test_asr_homophone_left_kou_is_a_literal_bracket_candidate(tmp_path):
+    source = tmp_path / "main.py"
+    source.write_text('class Scene:\n    def construct(self):\n'
+                      '        with self.voiceover(text="已知函数 f(x) 的值"):\n'
+                      '            pass\n')
+    subtitle = tmp_path / "video.srt"
+    subtitle.write_text("1\n00:00:00,000 --> 00:00:05,000\n已知函数 f(x) 的值\n")
+    asr = {"status": "completed", "segments": [
+        {"start_ms": 0, "end_ms": 4000, "text": "已知函数f左口号x右口号的值"},
+    ]}
+    assert len(detect_one({"source_path": str(source), "subtitle_path": str(subtitle)}, asr)) == 1

@@ -3,6 +3,7 @@ from audio_inspector.semantic_review import (
     _spoken_canonical,
     _validate_audio,
     _validate_source,
+    actionable_source_issue,
     voiceovers,
 )
 
@@ -36,3 +37,15 @@ def test_spoken_equivalence_and_source_omission_direction():
     valid, rejected = _validate_audio(audio_issues, lines, segments)
     assert valid[0]["start_ms"] == 1000
     assert len(valid) == 1 and rejected == 1
+
+
+def test_self_negating_source_review_cannot_hide_real_audio_difference():
+    assert not actionable_source_issue({
+        "category": "source_wrong_expression", "confidence": "high",
+        "source_quote": "用三十八减五得到三十三",
+        "why": "三十八减五本身正确，无错误。",
+    })
+    assert actionable_source_issue({
+        "category": "source_missing_object", "confidence": "high",
+        "source_quote": "已知向量与 b 不共线", "why": "缺少变量 a。",
+    })

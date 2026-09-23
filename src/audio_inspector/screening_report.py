@@ -10,7 +10,7 @@ from collections import Counter
 from pathlib import Path
 from zipfile import ZIP_STORED, ZipFile
 
-from .semantic_review import _match
+from .semantic_review import _match, actionable_source_issue
 from .subtitle_cues import read_srt_cues
 
 OBVIOUS_GAP = re.compile(
@@ -50,12 +50,7 @@ def _reportable(issue: dict, kind: str) -> bool:
     if re.search(r"不构成(?:缺陷|问题|错误)|无直接错误|故不报告|表述可通|数学上等价", reason):
         return False
     if kind == "source":
-        if issue.get("confidence") == "low":
-            return False
-        suggested = re.sub(r"\s+", "", str(issue.get("suggested_reading") or ""))
-        original = re.sub(r"\s+", "", str(issue.get("source_quote") or ""))
-        return not (issue.get("category") == "source_wrong_expression"
-                    and suggested and suggested == original)
+        return actionable_source_issue(issue)
     if issue.get("confidence") not in {"high", "medium"}:
         return False
     if issue.get("category") == "audio_other":
