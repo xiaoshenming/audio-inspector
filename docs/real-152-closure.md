@@ -29,3 +29,9 @@
 用新 `dev-pb2-cycle` 接口在 B2B 隔离目录对同一原始样本执行 `start → decide approve_repair → status → decide accept_as_is`，没有人工改写源码文件或手工合成视频。第一次状态为 `awaiting_admin/candidate`，问题仍是漏读向量 a；管理员动作指定“已知向量 a 与 b 不共线”。模块自动生成新的 19.900 秒完整 MP4，源码、字幕都包含批准的文字，TTS 回执记录了 1 段重配音，复筛为 `clean`。**复筛 clean 后的会话仍处于 `awaiting_admin`，未自动放行**；第二次管理员动作才使其成为 `release_ready`。最终文件存在，视频 SHA 与放行建议一致；正式客户交付没有执行。
 
 会话与全部证据位于 `/var/lib/mathpi/dev-pb2-closure/review-cycle-2b03/cycle.json`、`round-1/repaired/`，可以用 `dev-pb2-cycle status --session /var/lib/mathpi/dev-pb2-closure/review-cycle-2b03` 读取简明状态。该实例只证明“发现 → 人工改文 → 重配完整视频 → 复筛 → 再人工确认”的接口闭环；其他样本仍需按其资源选择局部重配音或子节点重渲染。
+
+## 2026-09-24：工程审查后按新合同复跑
+
+在 B2B 隔离目录 `/var/lib/mathpi/dev-pb2-closure/review-baseline-2b03/` 再次从原始 MP4 开始，通过 `dev-pb2-cycle start → decide approve_repair → decide accept_as_is` 运行。这次请求显式传入原片 `tts_profile`，会话绑定视频、源码、字幕、未烧字幕原片及源码包的 SHA。首轮仍准确报出“已知向量与 b 不共线”缺 a；按批准文本重配并生成完整 MP4 后，源码与字幕都出现“已知向量 a 与 b 不共线”，修复回执保留原 `qwen_audio / qwen-audio-3.0-tts-plus / longanlufeng / 0.9` 参数，复筛为 `clean`。第二次管理员决定前状态为 `awaiting_admin`；决定后状态才是 `release_ready`，最终文件与回执 SHA 相同，大小 503491 字节。全过程未触碰客户任务或执行发送。
+
+随后针对“调用方传入原字幕 SHA，修复后必须更新新字幕 SHA”这一实际接入风险，在 `/var/lib/mathpi/dev-pb2-closure/review-baseline-sha-2b03/` 再跑一轮真实样本。新字幕 SHA 与新 SRT 文件一致，且与旧字幕 SHA 不同；复筛仍为 `clean`，再次由管理员确认后进入 `release_ready`。这验证了完整资源身份合同不会把新字幕误判为旧版本。

@@ -1,3 +1,5 @@
+import pytest
+
 from dev_pb2.literal_asr import target_clips
 from dev_pb2.literal_reading import detect_one
 
@@ -114,3 +116,36 @@ def test_complete_pipeline_can_inspect_every_function_cue(tmp_path):
     record = {"source_path": str(source), "subtitle_path": str(subtitle)}
     assert len(target_clips(record)) == 3
     assert len(target_clips(record, max_clips=0)) == 4
+
+
+def test_unaligned_function_subtitle_fails_literacy_lane(tmp_path, monkeypatch):
+    import json
+
+    from dev_pb2 import literal_asr
+
+    source = tmp_path / "main.py"
+    source.write_text('self.voiceover(text="求函数 f(x) 的值")\n')
+    subtitle = tmp_path / "video.srt"
+    subtitle.write_text("1\n00:00:00,000 --> 00:00:03,000\n完全不同的字幕\n")
+    video = tmp_path / "video.mp4"
+    video.write_bytes(b"unused")
+    record = {"item_id": "one", "source_path": str(source), "subtitle_path": str(subtitle),
+              "video_path": str(video)}
+    with pytest.raises(ValueError, match="subtitle_unaligned"):
+        target_clips(record)
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(json.dumps({"items": [record]}))
+    monkeypatch.setattr(literal_asr, "_shared_model", lambda *_: pytest.fail("model loaded"))
+    result = literal_asr.run_batch(manifest, tmp_path / "literal", targeted=True)
+    assert result["failed_open"] == 1
+    assert result["completed"] == 0
+
+
+def test_missing_subtitle_uses_full_video_duration_for_function_clip(tmp_path, monkeypatch):
+    from dev_pb2 import literal_asr
+
+    source = tmp_path / "main.py"
+    source.write_text('self.voiceover(text="求函数 f(x) 的值")\n')
+    monkeypatch.setattr(literal_asr, "_video_duration", lambda _: 42.5)
+    assert target_clips({"source_path": str(source), "video_path": "video.mp4"}) == [
+        {"start_seconds": 0.0, "end_seconds": 42.5}]

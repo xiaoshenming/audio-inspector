@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dev-pb2"
-version = "0.2.1"
+version = "0.3.0"
 description = "Independent evidence-only TTS review module for BatchOps"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -15,6 +15,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# The BatchOps SDK is only needed for full-scene worker rendering.
 batchops = ["tos>=2.9,<3"]
 dev = [
   "pytest>=8,<9",

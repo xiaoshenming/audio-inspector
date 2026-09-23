@@ -1,9 +1,10 @@
+import hashlib
 import io
 import tarfile
 
 import pytest
 
-from dev_pb2.repair_media import _audio_filter, _changed_cues
+from dev_pb2.repair_media import _audio_filter, _changed_cues, rebuild
 from dev_pb2.source_revision import revise_pack, revise_source
 
 
@@ -44,3 +45,42 @@ def test_revoice_uses_exact_subtitle_cue_and_preserves_timeline(tmp_path):
     assert "atrim=start=2.000:end=4.000" in graph
     assert "atrim=start=2.000:end=4.000,asetpts=PTS-STARTPTS,apad" in graph
     assert output == "[aout]"
+
+
+def test_direct_rebuild_rejects_source_pack_from_another_revision(tmp_path):
+    source = b'self.voiceover(text="other")\n'
+    archive = tmp_path / "source.tar"
+    with tarfile.open(archive, "w") as tar:
+        info = tarfile.TarInfo("main.py")
+        info.size = len(source)
+        tar.addfile(info, io.BytesIO(source))
+    video = tmp_path / "video.mp4"
+    video.write_bytes(b"video")
+    video_sha = hashlib.sha256(video.read_bytes()).hexdigest()
+    inspection = {"item_id": "one", "revision_id": "r1",
+                  "video_sha256": video_sha, "source_sha256": "a" * 64}
+    decision = {**inspection, "action": "approve_repair",
+                "voiceover_overrides": [{"old_voiceover": "other",
+                                         "new_voiceover": "new"}]}
+    with pytest.raises(ValueError, match="source_pack_main_mismatch"):
+        rebuild(inspection, decision, video=video, unburned=video,
+                subtitle=tmp_path / "none.srt", source_pack=archive,
+                output=tmp_path / "out", api_key="test", tts_endpoint="test")
+
+
+def test_direct_rebuild_rejects_changed_subtitle(tmp_path):
+    video = tmp_path / "video.mp4"
+    video.write_bytes(b"video")
+    subtitle = tmp_path / "subtitle.srt"
+    subtitle.write_text("original", encoding="utf-8")
+    digest = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
+    inspection = {"item_id": "item", "revision_id": "r1",
+                  "video_sha256": digest(video), "source_sha256": "a" * 64,
+                  "subtitle_sha256": digest(subtitle)}
+    decision = {**inspection, "action": "approve_repair",
+                "voiceover_overrides": [{"source_line": 1}]}
+    subtitle.write_text("changed", encoding="utf-8")
+    with pytest.raises(ValueError, match="stale_subtitle_revision"):
+        rebuild(inspection, decision, video=video, unburned=video,
+                subtitle=subtitle, source_pack=tmp_path / "source.tar",
+                output=tmp_path / "output", api_key="test", tts_endpoint="test")

@@ -59,6 +59,9 @@ def _strong_audio_difference(issue: dict) -> bool:
         heard = _math_expression(actual)
         if expected and heard and expected == heard:
             return False
+        if ("减" in source and "负" in actual
+                or "负" in source and "减" in actual):
+            return True
         return (("减" in source or "-" in source) and ("加" in actual or "+" in actual)
                 or ("加" in source or "+" in source) and ("减" in actual or "-" in actual))
     if category == "audio_wrong_number":
@@ -94,7 +97,7 @@ def _reportable(issue: dict, kind: str) -> bool:
                           _math_expression(str(issue.get("asr_quote") or ""))
         if expected and heard and expected == heard:
             return False
-    if re.search(r"同音|近音", reason):
+    if re.search(r"同音|近音", reason) and not _strong_audio_difference(issue):
         return False
     if issue.get("confidence") not in {"high", "medium"}:
         return _strong_audio_difference(issue)

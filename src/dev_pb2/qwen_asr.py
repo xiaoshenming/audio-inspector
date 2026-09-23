@@ -8,6 +8,7 @@ import concurrent.futures
 import hashlib
 import http.client
 import json
+import math
 import os
 import subprocess
 import time
@@ -20,7 +21,7 @@ from .manifest import load_manifest
 MODEL = "qwen-audio-3.1-asr-flash"
 
 
-def _audio_chunk(path: str, start: int, seconds: int) -> bytes:
+def _audio_chunk(path: str, start: int, seconds: float) -> bytes:
     command = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error",
                "-ss", str(start), "-i", path, "-t", str(seconds), "-vn",
                "-ac", "1", "-ar", "16000", "-c:a", "libmp3lame", "-b:a", "48k",
@@ -139,9 +140,11 @@ def _transcribe_chunk(audio: bytes, key: str, endpoint: str, offset_ms: int) -> 
 
 def transcribe(path: str, key: str, endpoint: str) -> dict:
     duration = _duration(path)
+    if not math.isfinite(duration) or duration <= 0:
+        raise ValueError("invalid_audio_duration")
     chunks = []
-    for start in range(0, max(1, int(duration)), 240):
-        audio = _audio_chunk(path, start, 240)
+    for start in range(0, max(1, math.ceil(duration)), 240):
+        audio = _audio_chunk(path, start, min(240, duration - start))
         result = _transcribe_chunk(audio, key, endpoint, start * 1000)
         chunks.append({"offset_seconds": start, **result})
     return {"model": MODEL, "duration_seconds": duration,

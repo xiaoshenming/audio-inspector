@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import subprocess
 import tempfile
 import threading
@@ -31,6 +32,18 @@ def _shared_model(name: str, cpu_threads: int):
         return _MODEL_CACHE[key]
 
 
+def _video_duration(path: str) -> float:
+    result = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+         "-of", "default=nk=1:nw=1", path],
+        capture_output=True, text=True, timeout=30, check=True,
+    )
+    duration = float(result.stdout.strip())
+    if not math.isfinite(duration) or duration <= 0:
+        raise ValueError("invalid_video_duration")
+    return duration
+
+
 def target_clips(record: dict, max_clips: int = 3) -> list[dict]:
     source = Path(record["source_path"]).read_text(encoding="utf-8")
     lines = [row for row in voiceovers(source)
@@ -39,18 +52,26 @@ def target_clips(record: dict, max_clips: int = 3) -> list[dict]:
         return []
     subtitle_path = str(record.get("subtitle_path") or "")
     cues = read_srt_cues(Path(subtitle_path)) if subtitle_path else []
-    relevant = [cue for cue in cues
-                if any(_match(cue["text"], row["text"])
-                       or _match(row["text"], cue["text"]) for row in lines)]
-    if not relevant and cues:
-        for row in lines:
+    relevant = []
+    for row in lines if cues else []:
+        matches = [cue for cue in cues
+                   if _match(cue["text"], row["text"])
+                   or _match(row["text"], cue["text"])]
+        if not matches:
             best = max(cues, key=lambda cue: cue_match_score(row["text"], cue["text"]))
-            score = cue_match_score(row["text"], best["text"])
-            if score >= 0.68 and best not in relevant:
-                relevant.append(best)
-        relevant.sort(key=lambda cue: cue["start_seconds"])
+            if cue_match_score(row["text"], best["text"]) >= 0.68:
+                matches = [best]
+        if not matches:
+            raise ValueError("function_voiceover_subtitle_unaligned")
+        relevant.extend(cue for cue in matches if cue not in relevant)
+    relevant.sort(key=lambda cue: cue["start_seconds"])
     if not relevant:
-        return [{"start_seconds": 0.0, "end_seconds": 30.0}] if not cues else []
+        if cues:
+            raise ValueError("function_voiceover_subtitle_unaligned")
+        duration = _video_duration(record["video_path"])
+        if duration > 600:
+            raise ValueError("function_voiceover_requires_subtitle_over_600_seconds")
+        return [{"start_seconds": 0.0, "end_seconds": duration}]
     if max_clips > 0 and len(relevant) > max_clips:
         indices = {round(i * (len(relevant) - 1) / max(1, max_clips - 1))
                    for i in range(max_clips)}
@@ -97,15 +118,15 @@ def run_batch(manifest: Path, output: Path, model_name: str = "small",
     for row in rows:
         item_id = row["item_id"]
         target = items / (hashlib.sha256(item_id.encode()).hexdigest()[:24] + ".json")
-        clips = target_clips(row, max_clips) if targeted else []
-        if target.is_file():
-            previous = json.loads(target.read_text())
-            if (previous.get("status") == "completed"
-                    and previous.get("targeted") == targeted
-                    and previous.get("clips") == clips):
-                results.append(previous)
-                continue
         try:
+            clips = target_clips(row, max_clips) if targeted else []
+            if target.is_file():
+                previous = json.loads(target.read_text())
+                if (previous.get("status") == "completed"
+                        and previous.get("targeted") == targeted
+                        and previous.get("clips") == clips):
+                    results.append(previous)
+                    continue
             if targeted:
                 spans = _transcribe_targeted(get_model(), row, clips) if clips else []
                 duration = sum(clip["end_seconds"] - clip["start_seconds"] for clip in clips)

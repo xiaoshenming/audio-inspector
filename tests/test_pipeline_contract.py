@@ -89,10 +89,56 @@ def test_audio_issue_resynthesizes_without_inventing_source_edit(tmp_path):
     proposal = result["issues"][0]
     assert proposal["repair_mode"] == "resynthesize_audio"
     assert proposal["proposed_text"] == "求的值"
+    assert "同文配音" in proposal["repair_guidance"]
     command = decide(result, source, "admin", "approve_repair",
                      [{"issue_id": proposal["issue_id"]}])
     assert command["voiceover_overrides"][0]["old_voiceover"] == \
         command["voiceover_overrides"][0]["new_voiceover"]
+    assert command["voiceover_overrides"][0]["repair_intent"] == "retry_same_text_tts"
+
+
+def test_changed_subtitle_changes_cache_key_and_inspection_identity(tmp_path):
+    video = tmp_path / "video.mp4"
+    video.write_bytes(b"video")
+    source = tmp_path / "source.py"
+    source.write_text('self.voiceover(text="你好")\n')
+    subtitle = tmp_path / "video.srt"
+    subtitle.write_text("first")
+    request = {"item_id": "one", "revision_id": "r1", "video_path": str(video),
+               "source_path": str(source), "subtitle_path": str(subtitle)}
+    first = prepare(request, tmp_path / "work")
+    first_sha = publish(first)["subtitle_sha256"]
+    subtitle.write_text("second")
+    second = prepare(request, tmp_path / "work")
+    second_sha = publish(second)["subtitle_sha256"]
+    assert first != second
+    assert first_sha != second_sha
+
+
+def test_stale_completed_item_does_not_mask_runner_failure(tmp_path):
+    root, _ = _dataset(tmp_path)
+    error = root / "semantic-source/items/runner-error.json"
+    error.write_text(json.dumps({"item_id": "item-1", "status": "failed_open"}))
+    assert publish(root)["status"] == "failed_open"
+
+
+def test_stage_exception_overrides_cached_completed_item(tmp_path, monkeypatch):
+    root, _ = _dataset(tmp_path)
+    row = json.loads((root / "metadata/input.json").read_text())
+    request = {"item_id": "item-1", "revision_id": "rev-1",
+               "video_path": row["video_path"], "source_path": row["source_path"]}
+
+    def unavailable(*args, **kwargs):
+        raise RuntimeError("provider_unavailable")
+
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "test")
+    monkeypatch.setenv("DASHSCOPE_ASR_ENDPOINT", "test")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test")
+    monkeypatch.setattr(pipeline.qwen_asr, "run_batch", unavailable)
+    monkeypatch.setattr(pipeline.semantic_review, "run_batch", lambda *args, **kwargs: None)
+    monkeypatch.setattr(pipeline.literal_asr, "run_batch", lambda *args, **kwargs: None)
+    monkeypatch.setattr(pipeline.literal_reading, "run_batch", lambda *args, **kwargs: None)
+    assert pipeline.run(request, tmp_path / "work")["status"] == "failed_open"
 
 
 def test_runner_exception_publishes_failed_open(tmp_path, monkeypatch):

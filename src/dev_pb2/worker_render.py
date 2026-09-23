@@ -7,6 +7,7 @@ import hashlib
 import hmac
 import json
 import os
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -16,6 +17,55 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 
 from .pipeline import run as inspect_video
 from .synthetic_tts import _digest, _duration
+
+DEFAULT_RENDER = {"aspect_ratio": "16:9", "quality": "m",
+                  "pixel_width": 1280, "pixel_height": 720, "frame_rate": 30}
+DEFAULT_TTS = {"enabled": True, "provider": "qwen_audio",
+               "model": "qwen-audio-3.0-tts-plus", "voice": "longanlufeng",
+               "speech_rate": 0.9}
+
+
+def _read_json(path: Path) -> dict:
+    try:
+        return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return {}
+
+
+def _write_json(path: Path, value: dict) -> None:
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
+                                     prefix=".render-", delete=False) as stream:
+        temporary = Path(stream.name)
+        json.dump(value, stream, ensure_ascii=False, indent=2)
+        stream.write("\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+    temporary.replace(path)
+
+
+def _profiles(request: dict) -> tuple[dict, dict]:
+    render, tts = request.get("render_profile"), request.get("tts_profile")
+    if not isinstance(render, dict) or not isinstance(tts, dict):
+        raise TypeError("worker_requires_original_render_and_tts_profiles")
+    required_render = set(DEFAULT_RENDER)
+    required_tts = set(DEFAULT_TTS) - {"enabled"}
+    if not required_render <= render.keys() or not required_tts <= tts.keys():
+        raise ValueError("worker_profile_missing_fields")
+    if (render["aspect_ratio"] not in {"16:9", "9:16", "1:1", "4:3", "3:4"}
+            or not all(isinstance(render[name], int) and 64 <= render[name] <= 4096
+                       for name in ("pixel_width", "pixel_height"))
+            or not isinstance(render["frame_rate"], int)
+            or not 1 <= render["frame_rate"] <= 60
+            or not isinstance(render["quality"], str)):
+        raise ValueError("invalid_render_profile")
+    if (tts.get("enabled", True) is not True or
+            not all(isinstance(tts[name], str) and tts[name].strip()
+                    for name in ("provider", "model", "voice"))
+            or not isinstance(tts["speech_rate"], (int, float))
+            or not 0.5 <= tts["speech_rate"] <= 2.0):
+        raise ValueError("invalid_tts_profile")
+    return {name: render[name] for name in required_render}, {
+        **{name: tts[name] for name in required_tts}, "enabled": True}
 
 
 def _json_request(url: str, token: str, payload: dict | None = None) -> dict:
@@ -40,23 +90,22 @@ def _capability(generation_id: UUID, secret: str, locator: str | None = None) ->
 
 def build_job(generation_id: UUID, item_id: str, source_uri: str,
               source_sha: str, main_sha: str, *, tenant_id: str,
-              intake_url: str, signing_secret: str, bucket: str) -> dict:
+              intake_url: str, signing_secret: str, bucket: str,
+              render_profile: dict | None = None, tts_profile: dict | None = None) -> dict:
     endpoint = f"{intake_url.rstrip('/')}/v1/internal/render/{generation_id}"
+    safe_item = hashlib.sha256(item_id.encode()).hexdigest()[:20]
     return {"tenant_id": tenant_id, "idempotency_key": f"dev-pb2-render:{generation_id}",
             "source": {"uri": source_uri, "sha256": source_sha,
                        "role": "teacher_confirmed_source", "locked": True,
                        "download_signing_url": endpoint + "/source-download",
                        "download_signing_token": _capability(
                            generation_id, signing_secret, source_uri)},
-            "batch_id": f"dev-pb2-{item_id}", "profile": "delivery_high",
+            "batch_id": f"dev-pb2-{safe_item}", "profile": "delivery_high",
             "priority": -100,
             "runtime": {"image": "mathpi-render:stable", "entrypoint": "main.py",
                         "timeout_seconds": 3600},
-            "render": {"aspect_ratio": "16:9", "quality": "m",
-                       "pixel_width": 1280, "pixel_height": 720, "frame_rate": 30},
-            "tts": {"enabled": True, "provider": "qwen_audio",
-                    "model": "qwen-audio-3.0-tts-plus", "voice": "longanlufeng",
-                    "speech_rate": 0.9},
+            "render": render_profile or DEFAULT_RENDER,
+            "tts": tts_profile or DEFAULT_TTS,
             "branding": {"mode": "source"},
             "resources": {"cpu_cores": 4, "memory_mb": 8192, "slots": 1},
             "selected_content_version_id": str(generation_id),
@@ -92,21 +141,32 @@ def _download(client, bucket: str, artifact: dict, target: Path) -> None:
 
 
 def render_full(source_pack: Path, source_main: Path, item_id: str,
-                output: Path, *, timeout_seconds: int = 3600) -> dict:
+                output: Path, *, timeout_seconds: int = 3600,
+                render_profile: dict | None = None,
+                tts_profile: dict | None = None) -> dict:
     output.mkdir(parents=True, exist_ok=True)
     source_sha = _digest(source_pack)
     main_sha = _digest(source_main)
     receipt = output / "receipt.json"
-    if receipt.is_file():
-        previous = json.loads(receipt.read_text())
+    previous = _read_json(receipt)
+    if previous:
         video = Path(previous.get("video_path") or "")
+        subtitle = Path(previous.get("subtitle_path") or "")
         if (previous.get("source_pack_sha256") == source_sha
                 and previous.get("source_sha256") == main_sha and video.is_file()
-                and _digest(video) == previous.get("video_sha256")):
+                and _digest(video) == previous.get("video_sha256")
+                and (not previous.get("subtitle_path") or
+                     (subtitle.is_file() and _digest(subtitle) == previous.get("subtitle_sha256")))
+                and previous.get("render_profile") == (render_profile or DEFAULT_RENDER)
+                and previous.get("tts_profile") == (tts_profile or DEFAULT_TTS)):
             return previous
-    generation_id = uuid5(NAMESPACE_URL, f"dev-pb2:{item_id}:{source_sha}")
+    profile_digest = hashlib.sha256(json.dumps(
+        [render_profile or DEFAULT_RENDER, tts_profile or DEFAULT_TTS],
+        sort_keys=True).encode()).hexdigest()
+    generation_id = uuid5(NAMESPACE_URL, f"dev-pb2:{item_id}:{source_sha}:{profile_digest}")
     client, bucket = _object_store()
-    key = f"dev-pb2/closures/{item_id}/{source_sha}/source.tar"
+    safe_item = hashlib.sha256(item_id.encode()).hexdigest()[:20]
+    key = f"dev-pb2/closures/{safe_item}/{source_sha}/source.tar"
     client.put_object(bucket, key, content=source_pack.read_bytes(),
                       content_type="application/x-tar")
     locator = f"tos://{bucket}/{key}"
@@ -114,7 +174,8 @@ def render_full(source_pack: Path, source_main: Path, item_id: str,
         generation_id, item_id, locator, source_sha, main_sha,
         tenant_id=os.environ["DEV_PB2_TENANT_ID"],
         intake_url=os.environ["DEV_PB2_INTAKE_URL"],
-        signing_secret=os.environ["DEV_PB2_SIGNING_SECRET"], bucket=bucket)
+        signing_secret=os.environ["DEV_PB2_SIGNING_SECRET"], bucket=bucket,
+        render_profile=render_profile, tts_profile=tts_profile)
     api = os.environ["DEV_PB2_RENDER_API_URL"].rstrip("/")
     tenant_token = os.environ["DEV_PB2_TENANT_TOKEN"]
     created = _json_request(api + "/v1/jobs", tenant_token, job)
@@ -122,8 +183,7 @@ def render_full(source_pack: Path, source_main: Path, item_id: str,
     started = time.monotonic()
     while True:
         state = _json_request(api + f"/v1/jobs/{job_id}", tenant_token)
-        (output / "job-state.json").write_text(json.dumps(state, ensure_ascii=False,
-                                                      indent=2) + "\n")
+        _write_json(output / "job-state.json", state)
         if state["status"] in {"succeeded", "failed", "cancelled"}:
             break
         if time.monotonic() - started > timeout_seconds:
@@ -158,8 +218,11 @@ def render_full(source_pack: Path, source_main: Path, item_id: str,
               "source_sha256": main_sha, "source_path": str(source_main),
               "video_path": str(final), "video_sha256": _digest(final),
               "subtitle_path": str(subtitle_path) if subtitle else "",
+              "subtitle_sha256": _digest(subtitle_path) if subtitle else "",
+              "render_profile": render_profile or DEFAULT_RENDER,
+              "tts_profile": tts_profile or DEFAULT_TTS,
               "duration_seconds": _duration(final)}
-    receipt.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
+    _write_json(receipt, result)
     return result
 
 
@@ -167,21 +230,24 @@ def render_and_inspect(request: dict, source_pack: Path, source_main: Path,
                        output: Path, work_root: Path,
                        job_item_id: str | None = None) -> dict:
     output.mkdir(parents=True, exist_ok=True)
-    rendered = render_full(source_pack, source_main, job_item_id or request["item_id"], output)
+    render_profile, tts_profile = _profiles(request)
+    rendered = render_full(source_pack, source_main, job_item_id or request["item_id"],
+                           output, render_profile=render_profile,
+                           tts_profile=tts_profile)
     revised_request = {**request, "revision_id": request["revision_id"]
                        + ":worker:" + rendered["render_job_id"],
                        "video_path": rendered["video_path"],
                        "video_sha256": rendered["video_sha256"],
                        "source_path": rendered["source_path"],
                        "source_sha256": rendered["source_sha256"],
-                       "subtitle_path": rendered["subtitle_path"]}
+                       "subtitle_path": rendered["subtitle_path"],
+                       "subtitle_sha256": rendered["subtitle_sha256"]}
     after = inspect_video(revised_request, work_root)
     result = {"schema_version": "dev-pb2.worker-closure.v1",
               "render": rendered, "reinspection": after,
               "status": ("reinspection_clean" if after["status"] == "clean"
                          else "reinspection_needs_review")}
-    (output / "closure.json").write_text(json.dumps(result, ensure_ascii=False,
-                                                   indent=2) + "\n")
+    _write_json(output / "closure.json", result)
     return result
 
 

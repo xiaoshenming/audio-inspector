@@ -18,11 +18,16 @@ def _replacement(source: Path, issue: dict, new_text: str) -> dict:
                        or issue["source_line"] == line["line"])]
     if len(candidates) != 1 or candidates[0]["text"].count(original) != 1:
         raise ValueError("voiceover_target_not_unique")
+    if new_text == original and issue["repair_mode"] != "resynthesize_audio":
+        raise ValueError("source_repair_requires_changed_text")
     line = candidates[0]
     return {"source_line": line["line"], "old_voiceover": line["text"],
             "new_voiceover": line["text"].replace(original, new_text, 1),
             "mode": ("replace_voiceover_text" if new_text != original
-                     else issue["repair_mode"]), "issue_id": issue["issue_id"]}
+                     else issue["repair_mode"]), "issue_id": issue["issue_id"],
+            "repair_intent": ("retry_same_text_tts" if new_text == original
+                              and issue["repair_mode"] == "resynthesize_audio"
+                              else "change_spoken_text")}
 
 
 def _manual_replacement(source: Path, edit: dict) -> dict:
@@ -39,7 +44,7 @@ def _manual_replacement(source: Path, edit: dict) -> dict:
         raise ValueError("manual_voiceover_target_not_unique")
     return {"source_line": matches[0]["line"], "old_voiceover": old,
             "new_voiceover": new, "mode": "replace_voiceover_text",
-            "issue_ids": []}
+            "repair_intent": "change_spoken_text", "issue_ids": []}
 
 
 def decide(inspection: dict, source_path: Path, actor: str, action: str,
@@ -97,6 +102,8 @@ def decide(inspection: dict, source_path: Path, actor: str, action: str,
                 current["issue_ids"].append(issue_id)
                 if change["mode"] == "replace_voiceover_text":
                     current["mode"] = change["mode"]
+                if current["new_voiceover"] != current["old_voiceover"]:
+                    current["repair_intent"] = "change_spoken_text"
             else:
                 change["issue_ids"] = [issue_id]
                 by_line[line] = change
@@ -110,7 +117,8 @@ def decide(inspection: dict, source_path: Path, actor: str, action: str,
                "video_sha256": inspection["video_sha256"],
                "source_sha256": inspection["source_sha256"],
                "actor": actor.strip(), "action": action, "note": note[:2000],
-               "next_action": next_action, "voiceover_overrides": changes}
+               "next_action": next_action, "voiceover_overrides": changes,
+               "subtitle_sha256": inspection.get("subtitle_sha256", "")}
     command["idempotency_key"] = hashlib.sha256(json.dumps(command,
         ensure_ascii=False, sort_keys=True).encode()).hexdigest()
     return command

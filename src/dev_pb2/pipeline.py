@@ -32,7 +32,11 @@ def prepare(request: dict, work_root: Path) -> Path:
     source = Path(str(request.get("source_path") or "")).expanduser().resolve()
     if not video.is_file() or not source.is_file():
         raise ValueError("video_and_source_files_required")
-    hashes = {"video_sha256": _sha(video), "source_sha256": _sha(source)}
+    subtitle = str(request.get("subtitle_path") or "")
+    if subtitle and not Path(subtitle).is_file():
+        raise ValueError("subtitle_file_missing")
+    hashes = {"video_sha256": _sha(video), "source_sha256": _sha(source),
+              "subtitle_sha256": _sha(Path(subtitle)) if subtitle else ""}
     for name, digest in hashes.items():
         if request.get(name) and request[name] != digest:
             raise ValueError(f"{name}_mismatch")
@@ -42,9 +46,6 @@ def prepare(request: dict, work_root: Path) -> Path:
     root = work_root / key
     metadata = root / "metadata"
     metadata.mkdir(parents=True, exist_ok=True)
-    subtitle = str(request.get("subtitle_path") or "")
-    if subtitle and not Path(subtitle).is_file():
-        raise ValueError("subtitle_file_missing")
     row = {"item_id": item_id, "video_path": str(video), "source_path": str(source),
            "subtitle_path": subtitle}
     (root / "manifest.json").write_text(json.dumps({"items": [row]}, ensure_ascii=False,
@@ -67,11 +68,17 @@ def prepare(request: dict, work_root: Path) -> Path:
 
 
 def _item_status(directory: Path, item_id: str) -> str:
+    error_file = directory / "items/runner-error.json"
+    if error_file.is_file():
+        error = json.loads(error_file.read_text())
+        if error.get("item_id") == item_id:
+            return "failed_open"
+    statuses = []
     for path in (directory / "items").glob("*.json"):
         value = json.loads(path.read_text())
         if value.get("item_id") == item_id:
-            return str(value.get("status") or "missing")
-    return "missing"
+            statuses.append(str(value.get("status") or "missing"))
+    return statuses[0] if len(statuses) == 1 else "missing"
 
 
 def publish(root: Path) -> dict:
@@ -103,12 +110,16 @@ def publish(root: Path) -> dict:
                            "proposed_text": proposal,
                            "repair_mode": ("replace_voiceover_text" if kind == "source"
                                            else "resynthesize_audio"),
+                           "repair_guidance": ("核对并编辑建议口播，再重新配音" if kind == "source"
+                                               else "原文未改；仅重试同文配音。若读法有歧义，"
+                                                    "请在输入框写出明确的新口播。"),
                            "reason": issue.get("why", "")})
     status = "failed_open" if not complete else "candidate" if issues else "clean"
     result = {"schema_version": "dev-pb2.inspection.v1", "item_id": item_id,
               "revision_id": identity["revision_id"],
               "video_sha256": identity["video_sha256"],
               "source_sha256": identity["source_sha256"],
+              "subtitle_sha256": identity["subtitle_sha256"],
               "status": status, "lanes": lane_status, "issues": issues,
               "can_continue": status == "clean", "needs_admin_review": status != "clean",
               "evidence_only": True, "unattended_release_validated": False}

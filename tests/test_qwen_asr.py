@@ -1,3 +1,4 @@
+from dev_pb2 import qwen_asr
 from dev_pb2.qwen_asr import _decode_events, _response_events
 
 
@@ -28,3 +29,18 @@ def test_cumulative_qwen_events_become_incremental_timed_segments():
 
 def test_nonstream_qwen_json_is_one_event():
     assert _response_events(b'{"output":{"text":"hello"}}')[0]["output"]["text"] == "hello"
+
+
+def test_fractional_tail_after_chunk_boundary_is_transcribed(monkeypatch):
+    starts = []
+    monkeypatch.setattr(qwen_asr, "_duration", lambda _: 240.5)
+
+    def audio(_path, start, seconds):
+        starts.append((start, seconds))
+        return b"audio"
+
+    monkeypatch.setattr(qwen_asr, "_audio_chunk", audio)
+    monkeypatch.setattr(qwen_asr, "_transcribe_chunk", lambda *_: {
+        "text": "ok", "segments": []})
+    qwen_asr.transcribe("sample.mp4", "key", "endpoint")
+    assert starts == [(0, 240), (240, 0.5)]

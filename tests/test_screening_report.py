@@ -69,3 +69,12 @@ def test_equivalent_asr_notation_and_homophones_are_filtered():
     assert not _reportable({"category": "audio_wrong_letter", "confidence": "medium",
                             "source_quote": "代回原条件", "asr_quote": "带回原条件",
                             "why": "两个词同音近音"}, "audio")
+
+
+def test_critical_letter_and_operator_differences_survive_near_sound_reason():
+    assert _reportable({"category": "audio_wrong_letter", "confidence": "high",
+                        "source_quote": "连接 BAD", "asr_quote": "连接 BAND",
+                        "why": "字母多读了 N，属于近音"}, "audio")
+    assert _reportable({"category": "audio_wrong_operator", "confidence": "high",
+                        "source_quote": "减九", "asr_quote": "负九",
+                        "why": "减号读成负号，二者近音"}, "audio")

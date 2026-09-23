@@ -1,82 +1,61 @@
 # DEV-PB2
 
-面向 BatchOps 最终带配音视频的独立旁白审查模块。它接收最终 MP4、实际配音所用源码、可选字幕和题目上下文，输出可定位的疑点、简短的“原文 → 建议新文”与稳定的机器合同。模块不修改 BatchOps 状态，也不自动拒绝交付。
+面向 BatchOps 最终带配音视频的独立审查与重配音模块。输入同一版本的 MP4、配音源码、可选字幕及题目，输出可跳转的疑点、原文与建议新文。管理员可选择放行或改写建议；模块按批准文字重新配音并生成完整视频，再次检查并等待管理员确认。模块不修改 BatchOps 任务，不发送客户视频。
 
-交给同事时先看[模块交接清单](docs/module-handoff.md)和[BatchOps 接入合同](docs/batchops-integration.md)。
+**推荐入口是 `dev-pb2-cycle`。** [交接清单](docs/module-handoff.md)讲如何运行；[对外协议](docs/batchops-integration.md)讲字段与状态；[BatchOps 接入教程](docs/batchops-adapter-guide.md)给出真实接点、资源映射及改文后如何创建新权威版本。[工程基线审查](docs/code-review-baseline-20260924.md)记录本轮修复、验证和剩余边界。
 
-## 交付前的三种结果
+## 运行
 
-| `status` | 含义 | 给 BatchOps 的信号 |
-|---|---|---|
-| `clean` | 所有审查步骤完成，未发现候选 | `can_continue=true`，沿原有交付流程继续 |
-| `candidate` | 找到值得核听的疑点 | `needs_admin_review=true`，显示时间点和文字对照 |
-| `failed_open` | 请求失败或证据不完整 | 告知管理员“尚未完成筛查”，不能显示成“没问题” |
-
-对候选，管理员可以选择“没问题，继续交付”或“确认修复并重做”；第二种操作允许逐条修改建议新文。`dev-pb2-cycle` 把筛查、管理员决定、实际重配音、完整 MP4、复筛与再次等待管理员确认串成独立循环。最终发送仍由 BatchOps 编排。AI 只提出疑点和文字建议，不能擅自确认修复或释放给客户。
-
-## 安装和运行
-
-需要 Python 3.11+、FFmpeg/ffprobe；函数记号字面读法补查需要 faster-whisper small 模型。密钥和 ASR 端点从环境变量读取。
+需要 Python 3.11+、FFmpeg/ffprobe、`faster-whisper` small 模型。`local` 局部重配音还要求 FFmpeg 带 `libass` 的 `subtitles` 滤镜；可用 `ffmpeg -hide_banner -filters | rg ' subtitles '` 预检，缺少该滤镜时选择具备此能力的构建或使用 `worker` 模式。Qwen ASR、DeepSeek 和本地重配音 TTS 的密钥/端点从环境变量读取；字段名见 `.env.example`。worker 完整渲染路线另需 `.[batchops]` 与隔离 Render 子节点参数。
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -e '.[dev]'
-export DASHSCOPE_API_KEY=...
-export DASHSCOPE_ASR_ENDPOINT=...
-export DEEPSEEK_API_KEY=...
-dev-pb2 inspect --request request.json --work-root /private/dev-pb2-runs
+python -m pip install -e .
+# 在私有环境中设置 DASHSCOPE_API_KEY、DASHSCOPE_ASR_ENDPOINT、
+# DASHSCOPE_TTS_ENDPOINT 和 DEEPSEEK_API_KEY
+dev-pb2-cycle start --request request.json --session /private/pb2/session-1 \
+  --work-root /private/pb2/work --source-pack /private/source.tar \
+  --unburned /private/unburned.mp4 --repair-mode local
+dev-pb2-cycle status --session /private/pb2/session-1
 ```
 
-`request.json` 示例（文件应是最终确认的同一版本）：
+`request.json` 最小形状：
 
 ```json
 {
   "item_id": "batchops-item-123",
-  "revision_id": "R2",
+  "revision_id": "final-tts-r1",
   "video_path": "/private/final.mp4",
-  "source_path": "/private/final.py",
+  "source_path": "/private/main.py",
   "subtitle_path": "/private/final.srt",
+  "tts_profile": {"provider": "qwen_audio", "model": "qwen-audio-3.0-tts-plus", "voice": "longanlufeng", "speech_rate": 0.9},
   "question": {"question": "已知……，求……"}
 }
 ```
 
-生产调用还应提供 `video_sha256` 和 `source_sha256`，模块会核对实际文件。结果写在 `work-root/<输入指纹>/inspection.json`；命令也在标准输出打印 JSON。复用同样输入会复用已完成的阶段证据。`issues` 包含问题类别、时间点、源码行、原文、ASR 听到的文字、建议新文和修复方式。没有字幕仍能运行，但源码问题可能没有精确时间点。
+生产调用还应提供视频、源码、字幕 SHA，模块会核对实际文件。要修复还需要与源码同版的完整源码包；`local` 模式需要未烧字幕原片和可定位的字幕时间窗。完整 `worker` 渲染需另传原片 `render_profile`，字段见[对外协议](docs/batchops-integration.md#输入合同)。资源只给本地受控路径，不把签名 URL 或密钥写入请求。
 
-管理员决定示例：
+## 决定与循环
 
-```bash
-dev-pb2 decide --inspection /private/run/inspection.json \
-  --source /private/final.py --actor admin-42 \
-  --action approve_repair --edits edits.json --output /private/repair-command.json
-```
-
-`edits.json` 为 `[ {"issue_id":"...", "new_text":"管理员最终指定的文字"} ]`。要放行则使用 `--action accept_as_is`，无需 `--edits`。修复命令会带原视频/源码 SHA、版本号、管理员、幂等键及逐行口播替换；源码版本变化或问题 ID 不匹配会拒绝生成过期命令。详见[BatchOps 接入合同](docs/batchops-integration.md)。
-
-需要完整的人机循环时，调用 `dev-pb2-cycle start/status/decide`。首轮无疑点返回 `release_ready`；有疑点返回 `awaiting_admin`；管理员确认修改后模块生成新成片并复筛，**即使复筛为 clean 也再次返回 `awaiting_admin`**，直到管理员决定放行。完整命令和返回协议见[BatchOps 接入合同](docs/batchops-integration.md)。
-
-对有原始未烧字幕视频、且批准修改能唯一对应字幕时间窗的任务，可由模块直接执行一次完整测试闭环：
+| `phase` | 含义 |
+|---|---|
+| `release_ready` | 首轮检查干净，或管理员已明确放行；接入方核对 revision 与视频 SHA 后沿原有交付路径继续 |
+| `awaiting_admin` | 有疑点，或修复后的新成片已复查；显示视频位置和可编辑的新文，等待管理员 |
+| `repairing` | 已保存批准的修改，正在配音和复查；中断后用 `resume` 续跑同一决定 |
+| `inspection_failed` | 检查证据未完成；运行 `retry` 或交管理员处理，不当作没问题 |
 
 ```bash
-dev-pb2-close-loop --request request.json --work-root /private/dev-pb2-runs \
-  --unburned /private/final.unburned.mp4 --source-pack /private/source.tar \
-  --actor admin-42 --edits edits.json --output /private/pb2-closure
+# 候选需要管理员决定；edits.json 为 [{"issue_id":"...","new_text":"..."}]
+dev-pb2-cycle decide --session /private/pb2/session-1 \
+  --actor admin-42 --action approve_repair --edits edits.json
+# 修复后即使机器复查干净，仍需管理员再确认；也可以再次改文
+dev-pb2-cycle decide --session /private/pb2/session-1 \
+  --actor admin-42 --action accept_as_is
+dev-pb2-cycle retry --session /private/pb2/session-1
+dev-pb2-cycle resume --session /private/pb2/session-1
 ```
 
-该命令只使用管理员批准的文字修改源码包；然后重配对应句子的音、保持原画面时长并重做字幕，输出完整 MP4，最后再次运行全部筛查。新的音轨若需大幅加速或放慢，模块会明确要求走 BatchOps 的完整场景重渲染，不会强行拼接不自然的配音。测试闭环不向客户发布视频。
+筛查运行 Qwen ASR、DeepSeek 源码与音频语义审查，以及函数记号被机械念出括号的定向听写。初轮 `clean` 可原路放行；机器结果仅表示当前检查未提出候选，不能代表绝对无误。真实样本的人工循环记录见[单条闭环](docs/real-152-closure.md)；批量试验及独立漏检审计见[65 条报告](docs/real-65-closure.md)和[可靠性审计](docs/independent-reliability-audit.md)。
 
-需要完整渲染时，模块还提供可选的 `dev-pb2-worker-render` 子节点适配器：它提交独立 Render 测试任务，下载新成片并复筛。适配器额外安装 `.[batchops]`，凭据由调用方环境变量提供；它不会把测试视频释放给客户。65 条真实样本的批量试验由 `dev-pb2-prepare-shortlist`、`dev-pb2-batch-eval`、`dev-pb2-iterate`、`dev-pb2-worker-batch` 和 `dev-pb2-summary` 组成，逐条结果可续跑。
-
-## 筛查内容与数据
-
-筛查包含 Qwen ASR 听写、DeepSeek 源码旁白审查、源码与 ASR 差异审查，以及针对 `f(x)` 被念出“左括号……右括号”的定向逐字听写。多音字旧链路已从此分支移除。[筛查流程](docs/screening-workflow.md)保留每一阶段的独立运行命令。
-
-本分支继承此前全部 Git 提交历史，同时在本地 `input/synthetic-tts-20260923/` 与 `input/synthetic-tts-challenge-20260923/` 保存 600 条合成样本及报告，合计约 846 MB。媒体和可能含内部路径的报告被 Git 忽略；交给同事时需**连同样本包单独传送**。结论和样本限制见[量化记录](docs/synthetic-benchmark.md)。
-
-已在 B2B 服务器的隔离目录用 152 条真实终审视频中的一条完成“检出 → 人工确认文字 → 重配音并成片 → 再筛查”，详见[真实样本闭环回执](docs/real-152-closure.md)。
-
-随后对 152 条中的全部 65 条机器候选做了隔离批测：65 条都有新 MP4，40 条新成片复筛无候选，详见[65 条真实样本报告](docs/real-65-closure.md)。该批量试验使用机器建议模拟文字确认；没有员工的真实审核标签，不能作为人工认可修复率。
-
-再以独立听写和第二套源码复核核查了旧版“未报问题”和“修复后干净”两组，发现明确漏报及自动改文引入新错；**40/65 不能用于自动放行决策**。见[可用度与漏检风险审计](docs/independent-reliability-audit.md)。
-
-开发检查：`python -m pytest && python -m ruff check src tests && python -m compileall -q src tests`。
+`dev-pb2 inspect`、`dev-pb2 decide`、`dev-pb2-close-loop`、批量评测等命令仍可用于开发和研究；它们不是推荐的正式集成入口。开发检查：`python -m pytest && python -m ruff check src tests && python -m compileall -q src tests`。

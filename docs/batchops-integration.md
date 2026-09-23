@@ -1,79 +1,74 @@
-# DEV-PB2 → BatchOps 接入合同
+# DEV-PB2 对外协议
 
-## 位置
+本文是模块与 BatchOps 的交界面说明；具体接线步骤见 [BatchOps 接入教程](batchops-adapter-guide.md)。推荐只调用 `dev-pb2-cycle`（或同名 Python `start/load/view/apply/retry_inspection/resume_repair` 函数）。`dev-pb2 inspect`、`decide`、`rebuild` 是底层调试入口，不应由正式接入方自行拼接成另一套流程。
 
-当前 BatchOps 管理台在 `production-stage-panel.tsx` 的最终阶段展示带配音成片，并通过 `acceptTtsCompletion` 执行“管理员通过并释放给客户”。DEV-PB2 应在最终 MP4、最终源码和字幕都已固定后异步运行；管理台在该按钮旁展示筛查状态与问题卡片。独立模块不写 BatchOps 数据库、不发布客户视频、不在渲染链路安装质量阻断。
+## 边界与状态
 
-```text
-正式 TTS 成片 + 最终源码/字幕 + revision/SHA
- → DEV-PB2 inspect
- → clean：标记筛查完成，原有交付路径照常进行
- → candidate：显示时间点、原文、听到的文字和建议新文
-      ├─ 管理员“没问题，通过”：记录 accept_as_is，继续原有交付确认
-      └─ 管理员改写或确认新文：记录 approve_repair
-          → BatchOps 依据 voiceover_overrides 创建新 revision
-          → 重新配音并合成完整 MP4
-          → 新 SHA、新 revision 重新筛查；管理员再次确认
- → failed_open：显示未完成的阶段和原因，允许重试或人工处置；不称为“没问题”
+模块读取同一最终配音版本的 MP4、实际配音源码、字幕和题目，筛查后返回疑点与可修改的文字建议。它在独立会话目录保存检查、管理员决定、修复与复查证据；不会修改 BatchOps 数据库，也不会发送客户视频。
+
+| `phase` | 含义 | 接入方动作 |
+|---|---|---|
+| `release_ready` | 初轮检查为 `clean`，或管理员明确选择放行 | 核对 `release.revision_id` 与 `release.video_sha256`，走 BatchOps 原有交付确认 |
+| `awaiting_admin` | 检出疑点，或修复成片完成复查 | 展示当前视频、问题和文字建议；等待管理员决定 |
+| `repairing` | 已记录管理员批准的修复命令，正在配音/成片/复查 | 展示处理中；进程中断或上次失败时用 `resume` 续跑同一决定 |
+| `inspection_failed` | 检查证据未完成 | 展示失败状态，调用 `retry` 或交管理员处置；不可显示成“无问题” |
+
+**首轮 `clean` 可以沿原有交付路径继续。修复后的每一轮，即便机器复查为 `clean`，也必须再次由管理员决定。** `release_ready` 是带文件身份的模块建议，真正的客户放行仍由 BatchOps 自己的权限与版本流程处理。
+
+## 输入合同
+
+`start` 读取 UTF-8 JSON；以下字段标识同一个最终 TTS revision：
+
+```json
+{
+  "item_id": "batchops-item-123",
+  "revision_id": "content-version-and-tts-attempt-id",
+  "video_path": "/private/final.mp4",
+  "video_sha256": "64位十六进制 SHA-256",
+  "source_path": "/private/main.py",
+  "source_sha256": "64位十六进制 SHA-256",
+  "subtitle_path": "/private/final.srt",
+  "subtitle_sha256": "64位十六进制 SHA-256",
+  "tts_profile": {"provider": "qwen_audio", "model": "qwen-audio-3.0-tts-plus", "voice": "longanlufeng", "speech_rate": 0.9},
+  "render_profile": {"aspect_ratio": "16:9", "quality": "m", "pixel_width": 1280, "pixel_height": 720, "frame_rate": 30},
+  "question": {"question": "已知……，求……"}
+}
 ```
 
-## 输入和返回
+`item_id`、`revision_id`、`video_path`、`source_path` 必填。建议提供视频、源码及字幕 SHA：模块重算并校验，防止把不同版本的产物混在一起。`subtitle_path` 与题目可选，但缺字幕会降低问题定位精度。路径必须是模块进程可读的受控本地文件；COS/TOS 下载、鉴权、同版本资源归属由 BatchOps 适配层处理，不把临时签名 URL 或密钥写入 JSON。
 
-调用方把 COS 地址下载或挂载为受控本地文件后，传给 `dev-pb2 inspect`。首版命令行请求至少有 `item_id`、`revision_id`、`video_path`、`source_path`；推荐加 `subtitle_path`、题目上下文、最终文件 SHA。不要把临时签名 URL 或密钥写入结果。BatchOps 适配器负责从其权威任务中确认“这些资源属于同一次最终 TTS revision”；DEV-PB2 负责重新算 SHA 并校验传入 SHA。物理文件与 revision 不一致时不运行。
+要让模块**自己执行修复**，`start` 还需 `--source-pack` 指向与 `source_path` 同版的完整源码包，并选一种执行方式：
 
-`inspection.json` 的三个关键字段是 `status`、`can_continue`、`needs_admin_review`。每条 `issues` 含：
+- `--repair-mode local --unburned`：未烧字幕原片和唯一字幕时间窗可用时，局部重配音并合成完整 MP4。必须提供原片实际使用的 `tts_profile`；仅支持兼容的 Qwen Audio 参数，避免补音突然换音色。FFmpeg 必须带 libass `subtitles` 滤镜，`scripts/preflight.sh --local-repair` 可预检。语速变化过大等情形会返回错误，需选择完整渲染路线。
+- `--repair-mode worker`：提交隔离 Render 子节点完整渲染，必须提供原 `tts_profile` 与 `render_profile`，防止竖屏、音色和帧率变化。需要 `.[batchops]` 与 `.env.example` 中列出的控制面、TOS 等环境变量。测试任务不会关联客户交付单。
 
-- `issue_id`：同一输入和同一问题的稳定标识；
-- `kind/category/priority`：源码缺漏或成片疑似读错，以及细类；
-- `time_seconds/source_line`：点击核听位置及源码位置；
-- `original_text`：当前最终源码的连续原文；
-- `observed_text`：ASR 听到的连续文字，可能有识别误差；
-- `proposed_text`：简短建议，管理员可直接改；
-- `repair_mode`：`replace_voiceover_text` 或 `resynthesize_audio`。
+## 输出合同
 
-对纯音频疑点，源码可能本来正确，此时建议文字与源码相同，`repair_mode=resynthesize_audio` 表示重配音，不应伪造一个源码文字差异。对源码旁白缺漏，建议文字来自模型，**必须由管理员核对后确认**。
+`dev-pb2-cycle start/status/decide/retry/resume` 在标准输出返回 JSON。稳定的上层字段是 `schema_version`、`item_id`、`phase`、`round`、`inspection_status`、`revision_id`、`video_path`、`video_sha256`、`issues`、`release`、`decision_count`；`repairing` 时另带当前决定与 `last_error`。完整审计在会话目录 `cycle.json`，不要把整个会话文件直接展示给前端。
 
-## 人工决定与重做
+每条 `issues` 含 `issue_id`、`kind/category/priority`、`time_seconds`、`source_line`、`original_text`、`observed_text`、`proposed_text`、`repair_mode` 和 `reason`。`observed_text` 是 ASR 听写，可能识别错误；对纯音频读错，建议文字可能和源码相同，`repair_mode=resynthesize_audio` 表示只需重新配音。播放器跳转到 `time_seconds`，并允许管理员修改 `proposed_text` 后提交。
 
-`dev-pb2 decide` 返回 `dev-pb2.decision.v1`，包含 `action`、`actor`、`revision_id`、视频/源码 SHA、`idempotency_key` 和 `voiceover_overrides`。`accept_as_is` 对应管理员“没问题”；`approve_repair` 对应确认或改写修复文字。管理员提交 `issue_id + new_text`，模块只针对唯一的 `voiceover(text=...)` 原文生成整句旧文/新文对照；原文不唯一、版本过期、问题不属于当前结果时拒绝生成重做命令。多处同一口播的修改会合并成一条覆盖命令。
-
-BatchOps 消费 `rebuild_final_video` 时应按幂等键只创建一次**新**版本：先在权威源码中应用已确认的口播替换，随后用原有正式 TTS 与视频合成流程制作完整成片，并保存父 revision、旧/新文本、管理员和旧/新 SHA。新版本必须重新审查；不能把旧结果复用为新版本的“通过”。修复失败时保留旧的可播放视频和证据，由管理员决定下一步。
-
-## 为什么重做使用确定性编排
-
-管理员已经确定“改哪段、改成什么”后，后续步骤有固定顺序：版本校验 → 文本替换 → 正式 TTS → 完整成片 → SHA 核对 → 再审查。交给 Agent 自由选择修改点或生产动作，会增加不可预测性，也难以证明最终 MP4 与批准文本一致。AI 仍可用于发现问题和生成**待确认**建议；如需复杂源码修复，可另走现有人工/Agent 修复流程，但不能绕过新的 revision 和复审。
-
-## 接线前验收
-
-1. `clean` 不改变现有“管理员通过并释放给客户”的条件；`candidate` 在 UI 展示 A/B 全部候选，不能只显示 A。
-2. 视频可跳转到 `time_seconds`；管理员可修改 `proposed_text`，页面同时显示 `original_text` 与 `observed_text`。
-3. 同一决定重试不创建第二个 TTS 任务；旧 revision 或 SHA 无法套用修复命令。
-4. 重做后只审核新成片；旧结果、人工决定和输入 SHA 保留供追溯。
-5. `failed_open` 有明确状态和人工重试入口，不能被统计为 clean。
-
-当前分支实现了独立筛查、结果合同、人工决定命令，以及针对有未烧字幕原片和唯一字幕时间窗的**局部重配音成片闭环**。该执行器保存新源码包、修正字幕、重配音证据、完整 MP4 和再次筛查结果。局部重配音只适用于时间窗明确且音频时长变化较小的修改；否则返回“需要完整场景重渲染”，不能把它当成通用 Manim 替代品。
-
-## 独立循环接口
-
-`dev-pb2-cycle` 是给接入方或 Codex 调用的独立会话接口，不会发送视频给客户：
+## 管理员动作
 
 ```bash
-dev-pb2-cycle start --request request.json --session /path/to/session \
-  --work-root /path/to/work --unburned unburned.mp4 --source-pack source.tar
-dev-pb2-cycle status --session /path/to/session
-dev-pb2-cycle retry --session /path/to/session  # 仅 inspection_failed 时
-dev-pb2-cycle decide --session /path/to/session --actor admin-id \
-  --action approve_repair --edits edits.json
-dev-pb2-cycle decide --session /path/to/session --actor admin-id \
-  --action accept_as_is
+dev-pb2-cycle start --request request.json --session /private/pb2/item-123 \
+  --work-root /private/pb2/work --source-pack /private/source.tar \
+  --unburned /private/unburned.mp4 --repair-mode local
+dev-pb2-cycle status --session /private/pb2/item-123
+dev-pb2-cycle decide --session /private/pb2/item-123 \
+  --actor admin-42 --action approve_repair --edits edits.json
+dev-pb2-cycle decide --session /private/pb2/item-123 \
+  --actor admin-42 --action accept_as_is
+dev-pb2-cycle retry --session /private/pb2/item-123
+dev-pb2-cycle resume --session /private/pb2/item-123
 ```
 
-`start` 对初筛 `clean` 返回 `phase=release_ready`；`candidate` 返回 `phase=awaiting_admin`、问题列表、可播放视频路径与原文/建议新文。管理员选择 `accept_as_is` 后，返回绑定当前 revision 和视频 SHA 的 `release_ready`；选择 `approve_repair` 后，模块按照管理员确认的文字重新配音、生成完整 MP4、重新筛查，并**总是**回到 `awaiting_admin`。管理员可以重复修改或放行；即使机器复筛为 `clean`，新视频仍要经管理员确认。`failed_open` 返回 `inspection_failed`，不得当作通过。
+确认 AI 建议或手工改文时，`edits.json` 例子为 `[{"issue_id":"问题 ID","new_text":"管理员确认的完整读法"}]`。若修复后的机器结果无候选、管理员却听出新问题，可用 `[{"source_line":123,"old_voiceover":"完整旧旁白","new_voiceover":"完整新旁白"}]` 指定当前源码中的口播。模块核对当前源码、旧文本、revision 和 SHA；无匹配或过期决定不执行修复。
 
-`edits.json` 可以用 `[{"issue_id":"...","new_text":"..."}]` 接受或改写建议。复筛未报疑点但管理员听出新问题时，也可以用 `[{"source_line":123,"old_voiceover":"完整旧旁白","new_voiceover":"完整新旁白"}]` 指定准确口播；模块校验源码中的旧文唯一匹配。每轮决定、旧/新 SHA、TTS 产物和复筛证据保留在会话目录。重复提交已完成的决定会被状态拒绝，不会再次触发 TTS。`release_ready` 只是对外输出的交付建议与文件身份，正式客户放行仍由 BatchOps 原有权限流程执行。
+`accept_as_is` 生成 `release_ready`，其中 `release` 绑定当前 revision、视频 SHA 和管理员决定 ID。`approve_repair` 先持久保存批准的决定并进入 `repairing`，再执行文字替换、配音、完整成片和重新筛查，完成后返回 `awaiting_admin`。进程中断或执行报错时，使用 `resume` 续跑**同一决定**，不能在此时提交另一套文字；`inspection_failed` 则用 `retry` 重新筛查。每轮修复保存旧版证据和新成片，不覆盖输入视频。
 
-默认 `--repair-mode local` 使用未烧字幕原片与源码包进行局部重配音。需要完整场景重渲染时，`start` 改用 `--repair-mode worker --source-pack source.tar`，走独立 Render 子节点，随后同样回到管理员确认点。两种执行模式的会话输出协议一致；后者需要前述 BatchOps 子节点适配器环境变量。
+## 接入 BatchOps 时的责任
 
-对于需要完整场景重渲染的样本，可选安装 `.[batchops]`，由 `dev-pb2-worker-render` 使用修复后源码包向 BatchOps Render 控制面提交**独立测试任务**，让现有最新子节点完成正式 TTS 与完整 Manim 视频渲染；模块按签名上传合同取回 MP4、字幕并再次筛查。此适配器以环境变量接收控制面 URL、Intake 签名入口、TOS 和租户凭据，不把密钥写入仓库。它在隔离测试中已成功出片并复筛；仍需由同事决定如何映射到正式任务版本、权限和审计。
+BatchOps 最终放行入口在 `apps/batchops/control/components/admin/production-stage-panel.tsx` 的“管理员通过并释放给客户”，后端为 `apps/batchops/intake_api/app/routes/delivery_review.py` 的 `tts-completion/accept`。现有 `tts-completion/rerender` **只接收 `reason`，复用已经锁定的源码归档**；它不能接收 `voiceover_overrides`，不能直接用于“确认改文”。接入方需创建新的权威内容 revision / 源码包，绑定批准文字与原 TTS 版本，走正式 TTS 和完整成片流程，再以新 SHA、新 revision 调用模块复查。完整接线顺序和文件位置见[教程](batchops-adapter-guide.md)。
 
-BatchOps 的前端按钮、客户任务持久状态、正式交付授权和 COS/TOS 输入适配**尚未接线**。接线时应在 BatchOps 自己的仓库测试与部署，不要把这个隔离基线误当成已上线的客户交付流程。
+模块的本地或隔离子节点修复可以作为独立使用的闭环；其成片进入正式 BatchOps 前，接入方仍需负责产物入库、版本关系、访问控制和交付审计。不要把模块的 `release_ready` 直接解释成已经完成客户发送。
