@@ -12,6 +12,7 @@
 
 1. **原始旁白审查**：从最终 `main.py` 的 `voiceover(text=...)` 提取逐句文本和源码行号，DeepSeek 只寻找旁白本身的病句、缺失变量、运算对象和不可朗读的文本。屏幕显示但讲解无需逐字念出的内容不算问题。
 2. **成片听读审查**：Qwen Audio 3.1 把实际音轨转成带时间点的文本，再由 DeepSeek 比较最终旁白与 ASR。只留可引用两侧原文的数学对象差异；数字书写、大小写、标点、同义表达和 ASR 公式排版不直接算读错。源码中已存在的缺漏归入第一条链，避免重复和反向归因。
+3. **字面读法补查**：Qwen 3.1 可能把“f 左括号 x 右括号”润色成 `f(x)`，因此另用 faster-whisper small 只听最终旁白中出现原样函数记号的字幕时间窗。只有源码含 `f(x)`、`g(0)` 等记号、逐字听写出现“左括号…右括号”一类成对读法且时间窗对齐时，才生成独立的 `audio_literal_formula` 候选；点坐标的括号不混入函数记号类别。
 
 Qwen 的 SSE 句子内容会逐次累积；适配器把相邻最终事件切成增量片段。超过模型单次时长的音频按 240 秒切片，并将时间点加上切片偏移。空转写、请求失败与“完成且未发现候选”保持不同状态。
 
@@ -34,6 +35,12 @@ audio-inspector-semantic-review audio \
   --source-review-dir /private/batch/semantic-source \
   --output /private/batch/semantic-audio --workers 3
 
+audio-inspector-literal-asr --manifest /private/batch/manifest.json \
+  --output /private/batch/literal-asr-targeted --targeted --max-clips 3
+audio-inspector-literal-reading --manifest /private/batch/manifest.json \
+  --asr-dir /private/batch/literal-asr-targeted \
+  --output /private/batch/literal-reading
+
 audio-inspector-screening-report --dataset /private/batch
 audio-inspector serve --manifest /private/batch/manifest.json \
   --output /private/batch/screening-review --host 127.0.0.1 --port 8766
@@ -44,5 +51,6 @@ audio-inspector serve --manifest /private/batch/manifest.json \
 ## 边界与下一步
 
 - Qwen Audio 3.1 可能润色、补全或重排数学公式。ASR 的差异不是实际发音错误的证明，尤其要人工核听符号、上下标、声调和字母。
+- 定向逐字听写并不替代人工耳听；一次只抽取每视频至多 3 个函数记号时间窗，若要完整逐处采证，可提高 `--max-clips` 后重跑，并抽听未命中的函数记号样本评估漏检。
 - DeepSeek 可帮助找旁白病句，但也可能把合理概括误认为缺字。优先让员工审 A 级，再抽检 B 级和机器未报问题的样本，统计准确率与漏检率。
 - 接入 B2B 时建议在成片完成后异步创建观察任务，绑定最终视频、最终源码、字幕和模型版本的摘要；检测失败只记录 `failed_open`，不改变成片交付状态。

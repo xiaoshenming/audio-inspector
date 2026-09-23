@@ -34,6 +34,8 @@ audio-inspector-qwen-asr = "audio_inspector.qwen_asr:main"
 audio-inspector-semantic-review = "audio_inspector.semantic_review:main"
 audio-inspector-screening-report = "audio_inspector.screening_report:main"
 audio-inspector-review-server = "audio_inspector.review_server:main"
+audio-inspector-literal-asr = "audio_inspector.literal_asr:main"
+audio-inspector-literal-reading = "audio_inspector.literal_reading:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

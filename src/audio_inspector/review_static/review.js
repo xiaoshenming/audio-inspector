@@ -1,6 +1,6 @@
 const state={items:[],reviews:[],selected:null,reviewer:localStorage.getItem("audio-screening-reviewer")||""};
 const label={correct:"正确",missing:"漏字",incorrect:"不正确",uncertain:"待定"};
-const issueLabel={source_missing_object:"旁白缺少对象",source_wrong_expression:"原始表述有误",source_literal_tex:"原始文本含公式指令",audio_missing_object:"疑似少读对象",audio_wrong_operator:"疑似运算符读错",audio_wrong_number:"疑似数字读错",audio_wrong_unit:"疑似单位读错",audio_wrong_letter:"疑似字母读错",audio_other:"其他疑似读错"};
+const issueLabel={source_missing_object:"旁白缺少对象",source_wrong_expression:"原始表述有误",source_literal_tex:"原始文本含公式指令",audio_missing_object:"疑似少读对象",audio_wrong_operator:"疑似运算符读错",audio_wrong_number:"疑似数字读错",audio_wrong_unit:"疑似单位读错",audio_wrong_letter:"疑似字母读错",audio_literal_formula:"疑似机械念出括号",audio_other:"其他疑似读错"};
 const reviewer=document.querySelector("#reviewer");reviewer.value=state.reviewer;
 reviewer.addEventListener("change",()=>{state.reviewer=reviewer.value.trim();localStorage.setItem("audio-screening-reviewer",state.reviewer);render()});
 for(const id of ["tier","verdict","kind","search"])document.querySelector(`#${id}`).addEventListener("input",renderItems);

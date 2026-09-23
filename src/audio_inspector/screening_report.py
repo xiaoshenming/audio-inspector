@@ -11,6 +11,7 @@ from pathlib import Path
 from zipfile import ZIP_STORED, ZipFile
 
 from .semantic_review import _match
+from .subtitle_cues import read_srt_cues
 
 OBVIOUS_GAP = re.compile(
     r"(?:已知向量与|当等于|若(?:小于|大于|等于)|求的值|解得等于|"
@@ -22,20 +23,6 @@ OBVIOUS_GAP = re.compile(
 def _read_items(folder: Path) -> dict[str, dict]:
     return {row["item_id"]: row for path in (folder / "items").glob("*.json")
             if (row := json.loads(path.read_text(encoding="utf-8")))}
-
-
-def _srt_cues(path: Path) -> list[dict]:
-    if not path.is_file():
-        return []
-    cues = []
-    for block in re.split(r"\n\s*\n", path.read_text(encoding="utf-8-sig")):
-        match = re.search(r"(\d\d):(\d\d):(\d\d),(\d\d\d)\s*-->.*?\n([\s\S]*)", block)
-        if not match:
-            continue
-        h, m, s, ms = map(int, match.groups()[:4])
-        cues.append({"start_seconds": h * 3600 + m * 60 + s + ms / 1000,
-                     "text": match.group(5).strip().replace("\n", " ")})
-    return cues
 
 
 def _source_time(issue: dict, cues: list[dict]) -> float | None:
@@ -82,6 +69,7 @@ def compile_candidates(dataset: Path) -> list[dict]:
         samples = list(csv.DictReader(stream))
     source = _read_items(dataset / "semantic-source")
     audio = _read_items(dataset / "semantic-audio")
+    literal = _read_items(dataset / "literal-reading") if (dataset / "literal-reading").is_dir() else {}
     triage_path = dataset / "metadata/audio-triage.json"
     audio_triage = json.loads(triage_path.read_text()) if triage_path.is_file() else {}
     result = []
@@ -91,9 +79,11 @@ def compile_candidates(dataset: Path) -> list[dict]:
                          if _reportable(issue, "source")]
         audio_issues = [issue for issue in audio.get(item_id, {}).get("issues") or []
                         if _reportable(issue, "audio")]
+        audio_issues.extend(issue for issue in literal.get(item_id, {}).get("issues") or []
+                            if _reportable(issue, "audio"))
         if not source_issues and not audio_issues:
             continue
-        cues = _srt_cues(Path(sample["subtitle_path"])) if sample["subtitle_path"] else []
+        cues = read_srt_cues(Path(sample["subtitle_path"])) if sample["subtitle_path"] else []
         for issue in source_issues:
             issue["kind"] = "source"
             issue["time_seconds"] = _source_time(issue, cues)
@@ -103,6 +93,9 @@ def compile_candidates(dataset: Path) -> list[dict]:
         priority = _source_priority(source_issues) if source_issues else "B"
         triage = audio_triage.get(item_id) or {}
         if triage.get("priority") == "A" and audio_issues:
+            priority = "A"
+        if any(issue.get("category") == "audio_literal_formula"
+               and issue.get("confidence") == "high" for issue in audio_issues):
             priority = "A"
         result.append({"item_id": item_id, "external_key": sample["external_key"],
                        "batch_name": sample["batch_name"], "tts_status": sample["tts_status"],
