@@ -86,6 +86,8 @@ ssh -L 8765:127.0.0.1:8765 your-server-alias
 
 需要同时检查“最终源码旁白是否缺内容”和“成片读法是否偏离旁白”时，参见[双视角初筛流程](docs/screening-workflow.md)。该流程可选用 Qwen Audio 3.1 ASR 与 DeepSeek，分别保存两类候选证据，并生成可跳转时间点的人工复核页。结果只用于人工核听，不改变视频交付状态。
 
+需要让同事在线保存人工结论时，可使用[受管理员会话保护的复审服务](docs/human-review-server.md)。
+
 ## 服务器部署
 
 部署、资源预检、持久批任务、报告访问和恢复方法见[服务器部署与验证](docs/server-deployment.md)。架构和接入生产批处理系统的边界见[架构说明](docs/architecture.md)。

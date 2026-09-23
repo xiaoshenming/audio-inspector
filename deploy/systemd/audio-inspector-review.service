@@ -1,0 +1,25 @@
+[Unit]
+Description=MathPi Audio Inspector Human Review
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mathpi
+Group=mathpi
+WorkingDirectory=/opt/mathpi/review-sites/audio-inspector-app
+Environment=PYTHONPATH=/opt/mathpi/review-sites/audio-inspector-app/src
+EnvironmentFile=/etc/mathpi/server9/audio-inspector-review.env
+ExecStart=/opt/mathpi/server9/venv/bin/python -m audio_inspector.review_server --data-root /var/lib/mathpi/audio-inspector/review-152 --auth-url ${AUDIO_REVIEW_AUTH_URL} --host 0.0.0.0 --port 8115
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/mathpi/audio-inspector/review-152
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>终版 TTS 音频复审</title>
+  <link rel="stylesheet" href="/review.css">
+</head>
+<body>
+  <header class="topbar">
+    <div><h1>终版 TTS 音频复审</h1><p>从候选时间点听原片，逐条记录人工结论</p></div>
+    <div class="account"><label>评审人 <input id="reviewer" placeholder="填写姓名后保存结论"></label>
+      <a class="export" href="/api/export">导出全部评审记录</a></div>
+  </header>
+  <div id="metrics" class="metrics"></div>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="filters">
+        <select id="tier"><option value="">全部优先级</option><option value="A">A 级优先</option><option value="B">B 级扩展</option></select>
+        <select id="verdict"><option value="">全部人工状态</option><option value="pending">我尚未判断</option><option value="correct">正确</option><option value="missing">漏字</option><option value="incorrect">不正确</option><option value="uncertain">待定</option></select>
+        <select id="kind"><option value="">全部候选类型</option><option value="source">原始旁白缺漏</option><option value="audio">成片疑似读错</option></select>
+        <input id="search" placeholder="搜索题号、批次或原文">
+      </div>
+      <div id="items" class="items"></div>
+    </aside>
+    <main id="detail" class="detail"><div class="empty">请选择左侧一条视频开始复审。</div></main>
+  </div>
+  <script src="/review.js"></script>
+</body>
+</html>

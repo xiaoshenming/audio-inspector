@@ -33,9 +33,13 @@ audio-inspector-polyphone-report = "audio_inspector.polyphone_report:main"
 audio-inspector-qwen-asr = "audio_inspector.qwen_asr:main"
 audio-inspector-semantic-review = "audio_inspector.semantic_review:main"
 audio-inspector-screening-report = "audio_inspector.screening_report:main"
+audio-inspector-review-server = "audio_inspector.review_server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+audio_inspector = ["review_static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
