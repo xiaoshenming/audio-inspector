@@ -14,6 +14,8 @@ def test_literal_rewrite_proposes_natural_speech_and_keeps_math_object():
     edits = _edits(issues)
     assert edits[0]["new_text"] == "求 a 的值"
     assert edits[1]["new_text"] == "因此 f 在 x 处的值 小于一"
+    assert _literal_rewrite("f(x+3) 等于负 f(x)") == \
+        "f 在 x 加 3 处的值 等于负 f 在 x 处的值"
 
 
 def test_missing_proposal_stays_visible_as_unrepairable():

@@ -28,5 +28,6 @@ def test_summary_counts_only_reinspected_clean_videos(tmp_path):
     assert result["final_counts"] == {"machine_clean": 2,
                                       "needs_review_or_repair": 1}
     assert result["literal_machine_clean"] == 1
+    assert result["full_video_candidates"] == 3
     assert next(row for row in result["rows"] if row["item_id"] == "b")["video_path"] \
         == "round2.mp4"

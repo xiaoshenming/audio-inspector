@@ -21,6 +21,11 @@ def summarize(batch: Path, evaluation: Path) -> dict:
         first = _load(folder / "result.json")
         iteration = _load(folder / "iterations.json")
         worker = _load(folder / "worker-result.json")
+        details = iteration.get("details") or []
+        latest_video = (worker.get("video_path")
+                        or next((part.get("video_path") for part in reversed(details)
+                                 if part.get("video_path")), None)
+                        or first.get("video_path"))
         if worker.get("status") == "closure_clean":
             final = "machine_clean"
             mode = "full_scene_render"
@@ -32,7 +37,6 @@ def summarize(batch: Path, evaluation: Path) -> dict:
         elif iteration.get("status") == "closure_clean":
             final = "machine_clean"
             mode = "iterated_revoice"
-            details = iteration.get("details") or []
             video = next((row.get("video_path") for row in reversed(details)
                           if row.get("after_status") == "clean"), None)
         else:
@@ -44,7 +48,8 @@ def summarize(batch: Path, evaluation: Path) -> dict:
                      "initial": first.get("status", "missing"),
                      "iteration": iteration.get("status"),
                      "worker": worker.get("status"),
-                     "final": final, "repair_mode": mode, "video_path": video})
+                     "final": final, "repair_mode": mode, "video_path": video,
+                     "latest_video_path": latest_video})
     counts = Counter(row["final"] for row in rows)
     modes = Counter(row["repair_mode"] for row in rows if row["repair_mode"])
     literal = [row for row in rows
@@ -54,6 +59,7 @@ def summarize(batch: Path, evaluation: Path) -> dict:
               "staff_review_labels_available": False,
               "total": len(rows), "final_counts": dict(counts),
               "closure_rate": round(counts["machine_clean"] / len(rows), 4),
+              "full_video_candidates": sum(bool(row["latest_video_path"]) for row in rows),
               "repair_modes": dict(modes),
               "literal_cases": len(literal),
               "literal_machine_clean": sum(row["final"] == "machine_clean"
@@ -71,6 +77,7 @@ def summarize(batch: Path, evaluation: Path) -> dict:
              "`machine_clean` 仅表示新成片完成且全流程复筛无候选，不能当成人工确认正确。",
              "", "| 指标 | 数量 |", "|---|---:|",
              f"| 重新筛查的视频 | {len(rows)} |",
+             f"| 产出完整候选视频 | {result['full_video_candidates']} |",
              f"| 新成片复筛无候选 | {counts['machine_clean']} |",
              f"| 仍需核听或另定修复 | {counts['needs_review_or_repair']} |",
              f"| 函数括号类复筛无候选 | {result['literal_machine_clean']}/{len(literal)} |",

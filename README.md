@@ -2,6 +2,8 @@
 
 面向 BatchOps 最终带配音视频的独立旁白审查模块。它接收最终 MP4、实际配音所用源码、可选字幕和题目上下文，输出可定位的疑点、简短的“原文 → 建议新文”与稳定的机器合同。模块不修改 BatchOps 状态，也不自动拒绝交付。
 
+交给同事时先看[模块交接清单](docs/module-handoff.md)和[BatchOps 接入合同](docs/batchops-integration.md)。
+
 ## 交付前的三种结果
 
 | `status` | 含义 | 给 BatchOps 的信号 |
@@ -70,5 +72,7 @@ dev-pb2-close-loop --request request.json --work-root /private/dev-pb2-runs \
 本分支继承此前全部 Git 提交历史，同时在本地 `input/synthetic-tts-20260923/` 与 `input/synthetic-tts-challenge-20260923/` 保存 600 条合成样本及报告，合计约 846 MB。媒体和可能含内部路径的报告被 Git 忽略；交给同事时需**连同样本包单独传送**。结论和样本限制见[量化记录](docs/synthetic-benchmark.md)。
 
 已在 B2B 服务器的隔离目录用 152 条真实终审视频中的一条完成“检出 → 人工确认文字 → 重配音并成片 → 再筛查”，详见[真实样本闭环回执](docs/real-152-closure.md)。
+
+随后对 152 条中的全部 65 条机器候选做了隔离批测：65 条都有新 MP4，40 条新成片复筛无候选，详见[65 条真实样本报告](docs/real-65-closure.md)。该批量试验使用机器建议模拟文字确认；没有员工的真实审核标签，不能作为人工认可修复率。
 
 开发检查：`python -m pytest && python -m ruff check src tests && python -m compileall -q src tests`。
