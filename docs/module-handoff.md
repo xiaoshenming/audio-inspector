@@ -31,3 +31,5 @@ dev-pb2-close-loop --request request.json --work-root /private/pb2-runs \
 - 152 条真实终审视频的 65 条候选被用作隔离批测；同事复审站数据库在本轮读取时无已保存标签，所以报告只统计**新成片复筛无候选率**，不声称人工查准率。批测模块为 `shortlist.py`、`batch_eval.py`、`iterate.py`、`worker_batch.py` 和 `summary.py`，每条结果独立存档，可续跑。
 - 局部重配音不修改动画时间轴；若文字长度变化使语速明显失真，模块返回完整场景重渲染需求。函数记号、ASR 误转写和模型新发现的候选仍可能需要下一轮人工判断。
 - BatchOps 网页按钮、正式任务版本与客户释放动作均由同事接入。本仓库的子节点测试任务不属于客户完成单，也不会自动发布给客户。
+
+离线交接时，`DEV-PB2-history-20260923.bundle` 保存 `main` 与 `DEV-PB2` 的完整 Git 历史；`DEV-PB2-samples-600.tar` 是合成媒体；`DEV-PB2-real65-evidence-20260923.tar.gz` 含本轮汇总和代表性修复成片，SHA-256 为 `515a95b8ff303b0c1db7ff1f2914cfb09d9886096c60f55e4861e7b155a1db47`。65 条真实样本的全部输入与输出仍在 B2B 隔离目录 `/var/lib/mathpi/dev-pb2-closure/`，不加入公开 Git。以上归档在本机 `audio-inspector-dev-pb2` 同级目录。
