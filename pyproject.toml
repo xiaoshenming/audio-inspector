@@ -39,6 +39,7 @@ audio-inspector-literal-reading = "audio_inspector.literal_reading:main"
 audio-inspector-synthetic-corpus = "audio_inspector.synthetic_corpus:main"
 audio-inspector-synthetic-tts = "audio_inspector.synthetic_tts:main"
 audio-inspector-synthetic-eval = "audio_inspector.synthetic_eval:main"
+audio-inspector-synthetic-challenge = "audio_inspector.synthetic_challenge:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

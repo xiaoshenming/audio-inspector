@@ -45,14 +45,59 @@ def _source_priority(issues: list[dict]) -> str:
     return "B"
 
 
+def _math_expression(value: str) -> list[str]:
+    return [re.sub(r"\s+", "", match).replace("减", "-").replace("加", "+")
+            for match in re.findall(r"[A-Za-z0-9]+\s*(?:减|加|[-+])\s*[A-Za-z0-9]+", value)]
+
+
+def _strong_audio_difference(issue: dict) -> bool:
+    source = str(issue.get("source_quote") or "")
+    actual = str(issue.get("asr_quote") or "")
+    category = issue.get("category")
+    if category == "audio_wrong_operator":
+        expected = _math_expression(source)
+        heard = _math_expression(actual)
+        if expected and heard and expected == heard:
+            return False
+        return (("减" in source or "-" in source) and ("加" in actual or "+" in actual)
+                or ("加" in source or "+" in source) and ("减" in actual or "-" in actual))
+    if category == "audio_wrong_number":
+        expected = re.findall(r"\d+(?:\.\d+)?", source)
+        heard = re.findall(r"\d+(?:\.\d+)?", actual)
+        return bool(expected and heard and expected != heard
+                    and any(len(number) >= 2 for number in expected + heard)
+                    and not any(mark in source + actual for mark in ("/", "%")))
+    if category == "audio_wrong_letter":
+        expected = set(re.findall(r"(?<![A-Za-z])[A-Z]{2,4}(?![A-Za-z])", source))
+        heard = set(re.findall(r"(?<![A-Za-z])[A-Z]{2,4}(?![A-Za-z])", actual))
+        return bool(expected and heard and expected != heard)
+    if category in {"audio_wrong_unit", "audio_missing_object"}:
+        if any(expected in source and heard in actual
+               for expected, heard in (("立方厘米", "平方厘米"),
+                                       ("平方厘米", "立方厘米"),
+                                       ("立方米", "平方米"),
+                                       ("平方米", "立方米"))):
+            return True
+        return any(unit in source and unit not in actual and plain in actual
+                   for unit, plain in (("平方米", "米"), ("平方厘米", "厘米")))
+    return False
+
+
 def _reportable(issue: dict, kind: str) -> bool:
     reason = str(issue.get("why") or "")
     if re.search(r"不构成(?:缺陷|问题|错误)|无直接错误|故不报告|表述可通|数学上等价", reason):
         return False
     if kind == "source":
         return actionable_source_issue(issue)
-    if issue.get("confidence") not in {"high", "medium"}:
+    if issue.get("category") == "audio_wrong_operator":
+        expected, heard = _math_expression(str(issue.get("source_quote") or "")), \
+                          _math_expression(str(issue.get("asr_quote") or ""))
+        if expected and heard and expected == heard:
+            return False
+    if re.search(r"同音|近音", reason):
         return False
+    if issue.get("confidence") not in {"high", "medium"}:
+        return _strong_audio_difference(issue)
     if issue.get("category") == "audio_other":
         return False
     return not (issue.get("category") == "audio_wrong_letter"

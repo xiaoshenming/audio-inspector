@@ -45,3 +45,25 @@ def test_literal_reading_adds_previously_clean_video_to_priority_a(tmp_path):
     assert len(result) == 1
     assert result[0]["priority"] == "A"
     assert result[0]["audio_issues"][0]["category"] == "audio_literal_formula"
+
+
+def test_unscored_exact_math_differences_remain_reviewable():
+    cases = [
+        ("audio_wrong_operator", "用 48 减 5 得到 43", "用48+5得到43"),
+        ("audio_wrong_number", "解得 x 等于 25", "解得x=26"),
+        ("audio_wrong_letter", "连接线段 XY", "连接线段XZ"),
+        ("audio_missing_object", "面积为35平方米", "面积为35米"),
+        ("audio_wrong_unit", "体积为75立方厘米", "体积为75平方厘米"),
+    ]
+    for category, source, actual in cases:
+        assert _reportable({"category": category, "source_quote": source,
+                            "asr_quote": actual, "why": "值得核听"}, "audio")
+
+
+def test_equivalent_asr_notation_and_homophones_are_filtered():
+    assert not _reportable({"category": "audio_wrong_operator", "confidence": "medium",
+                            "source_quote": "已知 46 减 8 等于 38",
+                            "asr_quote": "已知46-8=38", "why": "疑似运算符差异"}, "audio")
+    assert not _reportable({"category": "audio_wrong_letter", "confidence": "medium",
+                            "source_quote": "代回原条件", "asr_quote": "带回原条件",
+                            "why": "两个词同音近音"}, "audio")

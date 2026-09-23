@@ -1,6 +1,7 @@
 import json
 
 from audio_inspector.semantic_review import voiceovers
+from audio_inspector.synthetic_challenge import build_cases as build_challenge_cases
 from audio_inspector.synthetic_corpus import GROUPS, build_cases, write_corpus
 from audio_inspector.synthetic_eval import _metrics
 from audio_inspector.synthetic_tts import _subtitles
@@ -49,3 +50,13 @@ def test_seeded_metrics_keep_natural_risks_out_of_precision():
     assert result["seeded_any_recall"] == 0.5
     assert result["seeded_precision_proxy"] == 1
     assert result["natural_candidate_rate"] == 1
+
+
+def test_challenge_uses_new_phrasings_and_six_balanced_groups():
+    cases = build_challenge_cases()
+    assert len(cases) == 60
+    assert len({row["item_id"] for row in cases}) == 60
+    assert all(row["split"] == "holdout" for row in cases)
+    assert sum(row["truth"] == "intended_clean" for row in cases) == 10
+    assert sum(row["truth"] == "seeded_source_defect" for row in cases) == 10
+    assert sum(row["truth"] == "seeded_audio_mismatch" for row in cases) == 40
