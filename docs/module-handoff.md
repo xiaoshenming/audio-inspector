@@ -3,7 +3,7 @@
 ## 从这里开始
 
 1. 阅读 [BatchOps 接入教程](batchops-adapter-guide.md) 和 [对外协议](batchops-integration.md)。正式接入只推荐 `dev-pb2-cycle`；底层 `inspect/decide/rebuild/worker-render` 是调试或实验入口。
-2. 安装 Python 3.11+、FFmpeg/ffprobe。筛查需 `faster-whisper` 的 `small` 模型、Qwen ASR 与 DeepSeek；本地重配音还需 TTS 端点及 FFmpeg 的 `subtitles` 滤镜（libass）。运行 `ffmpeg -hide_banner -filters | rg ' subtitles '` 预检；某些本机 FFmpeg 构建缺此滤镜，需换用具备它的构建或选 `worker` 模式。先按 `.env.example` 在环境中配置密钥，不把真实值放入仓库或交接包。
+2. 安装 Python 3.11+、FFmpeg/ffprobe。筛查需 `faster-whisper` 的 `small` 模型、Qwen ASR 与 DeepSeek；本地重配音还需 TTS 端点及 FFmpeg 的 `subtitles` 滤镜（libass）。运行 `ffmpeg -hide_banner -filters | rg ' subtitles '` 预检；某些本机 FFmpeg 构建缺此滤镜，需换用具备它的构建或选 `worker` 模式。**B2B 当前 ASR/TTS endpoint 的完整地址已在 `.env.example`**；只需从受限环境配置实际 API Key，不把密钥放入仓库或交接包。
 3. 按[输入合同](batchops-integration.md#输入合同)准备同一最终 TTS revision 的 MP4、实际配音源码、可选 SRT、题目、文件 SHA；要执行修复时再准备实际 TTS 参数、完整源码包及 `local` 模式的未烧字幕原片。`worker` 模式还需原渲染规格，不猜默认音色或画幅。
 4. 运行 `dev-pb2-cycle start/status/decide/retry/resume`。首轮 `clean` 输出 `release_ready`；候选等管理员；批准改文后进入 `repairing`，模块生成新成片并复查，每轮再次等管理员确认。中断或报错时 `resume` 续跑同一决定。模块不实际向客户发送。
 

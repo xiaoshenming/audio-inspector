@@ -18,7 +18,7 @@ Qwen 的 SSE 句子内容会逐次累积；适配器把相邻最终事件切成�
 
 ## 运行
 
-在受控环境中提供 `DASHSCOPE_API_KEY`、工作空间专属的 `DASHSCOPE_ASR_ENDPOINT` 和 `DEEPSEEK_API_KEY`。不要把密钥或专属端点放入日志、源码或报告。也可以通过 `--endpoint` 传入端点。
+在受控环境中提供 `DASHSCOPE_API_KEY`、`DASHSCOPE_ASR_ENDPOINT` 和 `DEEPSEEK_API_KEY`。B2B 当前使用的 ASR endpoint 已列在仓库根目录的 `.env.example`；TTS endpoint 也在同一文件。不要把密钥放入日志、源码或报告。也可以通过 `--endpoint` 传入端点。
 
 ```bash
 dev-pb2-qwen-asr --manifest /private/batch/manifest.json \

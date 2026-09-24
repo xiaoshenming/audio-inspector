@@ -12,13 +12,18 @@
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .
-# 在私有环境中设置 DASHSCOPE_API_KEY、DASHSCOPE_ASR_ENDPOINT、
-# DASHSCOPE_TTS_ENDPOINT 和 DEEPSEEK_API_KEY
+cp .env.example .env
+# 在 .env 中填写 DASHSCOPE_API_KEY 和 DEEPSEEK_API_KEY；endpoint 已有 B2B 当前值。
+set -a
+source .env
+set +a
 dev-pb2-cycle start --request request.json --session /private/pb2/session-1 \
   --work-root /private/pb2/work --source-pack /private/source.tar \
   --unburned /private/unburned.mp4 --repair-mode local
 dev-pb2-cycle status --session /private/pb2/session-1
 ```
+
+`DASHSCOPE_ASR_ENDPOINT` 是 Qwen 语音转文字的请求地址，`DASHSCOPE_TTS_ENDPOINT` 是 Qwen 文字转语音的请求地址。两者的 **B2B 当前值已填入 `.env.example`**，同事无需另找 URL。`DASHSCOPE_API_KEY` 是鉴权密钥，仍由服务器受限配置或团队的安全渠道提供。若在新的阿里云工作空间运行，应使用该工作空间对应的 endpoint。
 
 `request.json` 最小形状：
 
